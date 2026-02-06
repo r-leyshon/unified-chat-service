@@ -1,0 +1,358 @@
+"use client"
+
+import { useState, useEffect, useRef } from "react"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
+import Link from "next/link"
+import { Upload, FileText, Plus, ArrowLeft, Trash2, FolderOpen } from "lucide-react"
+
+type Project = { id: string; name: string; slug: string; created_at: string }
+type Document = { id: string; project_id: string; name: string; file_name: string; created_at: string }
+
+function dedupeProjectsById(projects: Project[]): Project[] {
+  const seen = new Set<string>()
+  return projects.filter((p) => {
+    if (seen.has(p.id)) return false
+    seen.add(p.id)
+    return true
+  })
+}
+
+function upsertProjectById(projects: Project[], project: Project): Project[] {
+  const idx = projects.findIndex((p) => p.id === project.id)
+  if (idx >= 0) {
+    const next = [...projects]
+    next[idx] = project
+    return next
+  }
+  return [...projects, project]
+}
+
+function formatUploadTime(createdAt: string): string {
+  const d = new Date(createdAt)
+  return d.toLocaleString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+export default function LibraryPage() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [documentsByProject, setDocumentsByProject] = useState<Record<string, Document[]>>({})
+  const [newProjectName, setNewProjectName] = useState("")
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [uploadingForProjectId, setUploadingForProjectId] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const uploadTargetProjectIdRef = useRef<string | null>(null)
+
+  const loadProjects = async () => {
+    try {
+      const res = await fetch("/api/projects")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg = typeof data?.error === "string" ? data.error : "Failed to load projects"
+        throw new Error(msg)
+      }
+      const list = Array.isArray(data) ? dedupeProjectsById(data) : []
+      setProjects(list)
+      return list
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load")
+      return []
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadDocumentsForProjects = async (projectIds: string[]) => {
+    const entries = await Promise.all(
+      projectIds.map(async (id) => {
+        const res = await fetch(`/api/documents?projectId=${encodeURIComponent(id)}`)
+        const data = res.ok ? await res.json() : []
+        return [id, Array.isArray(data) ? data : []] as const
+      }),
+    )
+    setDocumentsByProject((prev) => ({ ...prev, ...Object.fromEntries(entries) }))
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    loadProjects().then((list) => {
+      if (!cancelled && list.length > 0) loadDocumentsForProjects(list.map((p) => p.id))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const handleCreateProject = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = newProjectName.trim()
+    if (!name) return
+    setCreating(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to create")
+      setProjects((prev) => upsertProjectById(prev, data))
+      setDocumentsByProject((prev) => ({ ...prev, [data.id]: [] }))
+      setNewProjectName("")
+      setShowAddForm(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to create project")
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const triggerUpload = (projectId: string) => {
+    uploadTargetProjectIdRef.current = projectId
+    fileInputRef.current?.click()
+  }
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    const projectId = uploadTargetProjectIdRef.current
+    e.target.value = ""
+    uploadTargetProjectIdRef.current = null
+    if (!file || !projectId) return
+    setUploadingForProjectId(projectId)
+    setError(null)
+    try {
+      const formData = new FormData()
+      formData.set("projectId", projectId)
+      formData.set("file", file)
+      const res = await fetch("/api/documents/upload", { method: "POST", body: formData })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Upload failed")
+      setDocumentsByProject((prev) => ({
+        ...prev,
+        [projectId]: [{ ...data, project_id: projectId }, ...(prev[projectId] || [])],
+      }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed")
+    } finally {
+      setUploadingForProjectId(null)
+    }
+  }
+
+  const handleDeleteDocument = async (documentId: string, projectId: string) => {
+    setDeletingDocId(documentId)
+    setError(null)
+    try {
+      const res = await fetch(`/api/documents/${documentId}`, { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to delete")
+      setDocumentsByProject((prev) => ({
+        ...prev,
+        [projectId]: (prev[projectId] || []).filter((d) => d.id !== documentId),
+      }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete")
+    } finally {
+      setDeletingDocId(null)
+    }
+  }
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm("Delete this project and all its documents? This cannot be undone.")) return
+    setDeletingProjectId(projectId)
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to delete project")
+      setProjects((prev) => prev.filter((p) => p.id !== projectId))
+      setDocumentsByProject((prev) => {
+        const next = { ...prev }
+        delete next[projectId]
+        return next
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete project")
+    } finally {
+      setDeletingProjectId(null)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
+      <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-30 bg-background/95">
+        <div className="max-w-5xl mx-auto px-4 py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back
+            </Link>
+            <h1 className="text-xl font-bold text-foreground">Document Library</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            {showAddForm ? (
+              <form onSubmit={handleCreateProject} className="flex gap-2">
+                <Input
+                  placeholder="Project name"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  className="w-48 h-8 text-sm"
+                  autoFocus
+                />
+                <Button type="submit" size="sm" disabled={creating || !newProjectName.trim()}>
+                  {creating ? <Spinner className="w-4 h-4" /> : "Add"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowAddForm(false)
+                    setNewProjectName("")
+                  }}
+                >
+                  Cancel
+                </Button>
+              </form>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => setShowAddForm(true)}>
+                <Plus className="w-4 h-4" />
+                Add project
+              </Button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-6">
+        {error && (
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+            {error}
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".txt,.md,.pdf,.docx"
+          className="hidden"
+          onChange={handleUpload}
+        />
+
+        {loading ? (
+          <div className="flex items-center gap-2 text-muted-foreground py-12">
+            <Spinner className="w-5 h-5" /> Loading projects…
+          </div>
+        ) : projects.length === 0 ? (
+          <Card className="p-8 text-center">
+            <FolderOpen className="w-12 h-12 mx-auto text-muted-foreground mb-3" />
+            <p className="text-muted-foreground mb-4">No projects yet.</p>
+            <Button size="sm" onClick={() => setShowAddForm(true)}>
+              <Plus className="w-4 h-4" />
+              Add project
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => {
+              const docs = documentsByProject[project.id] ?? []
+              const isDeleting = deletingProjectId === project.id
+              return (
+                <Card key={project.id} className="p-4 flex flex-col">
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <h2 className="font-semibold text-foreground truncate flex-1" title={project.name}>
+                      {project.name}
+                    </h2>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => triggerUpload(project.id)}
+                        disabled={uploadingForProjectId !== null}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Upload document"
+                      >
+                        {uploadingForProjectId === project.id ? (
+                          <Spinner className="w-4 h-4" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={() => handleDeleteProject(project.id)}
+                        disabled={isDeleting}
+                        className="text-muted-foreground hover:text-destructive"
+                        aria-label="Delete project"
+                      >
+                        {isDeleting ? (
+                          <Spinner className="w-4 h-4" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    {docs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No documents. Upload a file.</p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {docs.map((d) => (
+                          <li
+                            key={d.id}
+                            className="flex items-center gap-2 text-sm border-b border-border/30 last:border-0 pb-1.5 last:pb-0"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                            <span className="truncate flex-1 min-w-0" title={d.name || d.file_name}>
+                              {d.name || d.file_name}
+                            </span>
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {formatUploadTime(d.created_at)}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              onClick={() => handleDeleteDocument(d.id, project.id)}
+                              disabled={deletingDocId === d.id}
+                              className="shrink-0 text-muted-foreground hover:text-destructive"
+                              aria-label="Delete document"
+                            >
+                              {deletingDocId === d.id ? (
+                                <Spinner className="w-3.5 h-3.5" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </main>
+    </div>
+  )
+}

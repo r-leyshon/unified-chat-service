@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import ChatAssistant from "@/components/chat-assistant"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -18,9 +19,14 @@ export default function Home() {
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
       {/* Header */}
       <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <h1 className="text-4xl font-bold text-foreground mb-2">Unified Chat Assistant</h1>
-          <p className="text-muted-foreground">A frontend component library + central service for in-product AI chat</p>
+        <div className="max-w-6xl mx-auto px-4 py-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-bold text-foreground mb-2">Unified Chat Assistant</h1>
+            <p className="text-muted-foreground">A frontend component library + central service for in-product AI chat</p>
+          </div>
+          <Link href="/library">
+            <Button variant="outline" size="sm">Document Library</Button>
+          </Link>
         </div>
       </header>
 

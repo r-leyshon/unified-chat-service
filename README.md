@@ -38,6 +38,46 @@ Completions use **GCP Vertex AI Gemini 2.5 Flash**. Credentials are loaded in an
 
 Enable the Vertex AI API for your GCP project and grant the service account appropriate Vertex AI permissions.
 
+## Document Library (Postgres + pgvector)
+
+The **Document Library** (`/library`) lets you create projects (e.g. per product or app) and upload **.pdf** or **.txt** files. Documents are chunked, embedded with Vertex AI **text-embedding-005**, and stored in Postgres with **pgvector** for RAG.
+
+### Local Postgres (development)
+
+You can use a **local Postgres** instance before deploying. The repo includes container recipes:
+
+1. **Start Postgres + pgvector** (Docker):
+   ```bash
+   make up
+   # or: docker compose up -d
+   ```
+   This starts a Postgres container with the `pgvector` extension and a `unified_chat` database (user/password: `postgres`/`postgres`).
+
+2. **Set `POSTGRES_URL` in `.env.local`**:
+   ```bash
+   make db-url
+   ```
+   Copy the printed line into `.env.local`, or add:
+   ```bash
+   POSTGRES_URL="postgresql://postgres:postgres@localhost:5432/unified_chat?sslmode=disable"
+   ```
+
+3. **Init schema:** With the app running (`npm run dev`), run once:
+   ```bash
+   make init-db
+   # or: curl -X POST http://localhost:3000/api/init-db
+   ```
+   This enables the `vector` extension and creates the `projects`, `documents`, and `document_chunks` tables.
+
+4. Open **[/library](http://localhost:3000/library)**: create a project, select it, and upload files.
+
+**Other commands:** `make down` — stop containers; `make logs` — follow Postgres logs. See the **Makefile** for all targets.
+
+### Deployed (Vercel / Neon)
+
+- **Vercel Postgres:** Create a database in the Vercel dashboard and add **`POSTGRES_URL`** to your project env. Then call **`POST /api/init-db`** once (e.g. after first deploy).
+- **Neon:** Create a project at [Neon](https://neon.tech), add **`POSTGRES_URL`** (connection string), and run **`POST /api/init-db`** once. Same code works; `@vercel/postgres` is deprecated but the client works with any Postgres URL, including Neon.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

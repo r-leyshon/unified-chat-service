@@ -1,0 +1,160 @@
+import { Pool } from "pg"
+
+let pool: Pool | null = null
+
+function getPool(): Pool {
+  if (!pool) {
+    const url = process.env.POSTGRES_URL
+    if (!url) throw new Error("POSTGRES_URL is not set")
+    pool = new Pool({ connectionString: url })
+  }
+  return pool
+}
+
+export type Project = {
+  id: string
+  name: string
+  slug: string
+  created_at: Date
+}
+
+export type Document = {
+  id: string
+  project_id: string
+  name: string
+  file_name: string
+  created_at: Date
+}
+
+/** Ensure pgvector extension and tables exist. Run once (e.g. POST /api/init-db). */
+export async function initVectorSchema() {
+  const db = getPool()
+  await db.query("CREATE EXTENSION IF NOT EXISTS vector")
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS documents (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `)
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS document_chunks (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+      content TEXT NOT NULL,
+      embedding vector(768)
+    )
+  `)
+  await db.query("CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id ON document_chunks(document_id)")
+  await db.query("CREATE INDEX IF NOT EXISTS idx_documents_project_id ON documents(project_id)")
+}
+
+export async function listProjects(): Promise<Project[]> {
+  const { rows } = await getPool().query("SELECT id, name, slug, created_at FROM projects ORDER BY name")
+  return rows as Project[]
+}
+
+export async function createProject(name: string): Promise<Project> {
+  const slug = name
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+  const { rows } = await getPool().query(
+    `INSERT INTO projects (name, slug) VALUES ($1, $2)
+     ON CONFLICT (slug) DO UPDATE SET name = $1
+     RETURNING id, name, slug, created_at`,
+    [name, slug],
+  )
+  return rows[0] as Project
+}
+
+export async function getProjectBySlug(slug: string): Promise<Project | null> {
+  const { rows } = await getPool().query(
+    "SELECT id, name, slug, created_at FROM projects WHERE slug = $1 LIMIT 1",
+    [slug],
+  )
+  return (rows[0] as Project) ?? null
+}
+
+export async function getProjectById(id: string): Promise<Project | null> {
+  const { rows } = await getPool().query(
+    "SELECT id, name, slug, created_at FROM projects WHERE id = $1 LIMIT 1",
+    [id],
+  )
+  return (rows[0] as Project) ?? null
+}
+
+/** Delete a project and all its documents and chunks (cascade). Returns true if a row was deleted. */
+export async function deleteProject(projectId: string): Promise<boolean> {
+  const { rowCount } = await getPool().query("DELETE FROM projects WHERE id = $1", [projectId])
+  return (rowCount ?? 0) > 0
+}
+
+export async function listDocuments(projectId: string): Promise<Document[]> {
+  const { rows } = await getPool().query(
+    `SELECT id, project_id, name, file_name, created_at FROM documents
+     WHERE project_id = $1 ORDER BY created_at DESC`,
+    [projectId],
+  )
+  return rows as Document[]
+}
+
+/** Delete a document and its chunks (cascade). Returns true if a row was deleted. */
+export async function deleteDocument(documentId: string): Promise<boolean> {
+  const { rowCount } = await getPool().query("DELETE FROM documents WHERE id = $1", [documentId])
+  return (rowCount ?? 0) > 0
+}
+
+export async function insertDocument(
+  projectId: string,
+  name: string,
+  fileName: string,
+): Promise<Document> {
+  const { rows } = await getPool().query(
+    `INSERT INTO documents (project_id, name, file_name) VALUES ($1, $2, $3)
+     RETURNING id, project_id, name, file_name, created_at`,
+    [projectId, name, fileName],
+  )
+  return rows[0] as Document
+}
+
+export async function insertChunk(
+  documentId: string,
+  content: string,
+  embedding: number[],
+): Promise<void> {
+  const vec = `[${embedding.join(",")}]`
+  await getPool().query(
+    "INSERT INTO document_chunks (document_id, content, embedding) VALUES ($1, $2, $3::vector)",
+    [documentId, content, vec],
+  )
+}
+
+/** Cosine similarity search: returns chunks with content for a project. */
+export async function searchChunks(
+  projectId: string,
+  queryEmbedding: number[],
+  limit: number = 5,
+): Promise<{ content: string; document_name: string }[]> {
+  const vec = `[${queryEmbedding.join(",")}]`
+  const { rows } = await getPool().query(
+    `SELECT c.content, d.name AS document_name
+     FROM document_chunks c
+     JOIN documents d ON d.id = c.document_id
+     WHERE d.project_id = $1
+     ORDER BY c.embedding <=> $2::vector
+     LIMIT $3`,
+    [projectId, vec, limit],
+  )
+  return rows as { content: string; document_name: string }[]
+}

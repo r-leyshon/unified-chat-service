@@ -1,0 +1,39 @@
+UNIT CONVERTER — REFERENCE
+==========================
+
+OVERVIEW
+--------
+The Unit Converter converts values between units in one category at a time. You enter a number, choose the "from" unit, choose the "to" unit, and the app shows the converted value. One category (e.g. length or weight) is supported per session.
+
+HOW TO USE
+----------
+1. Select a category (Length, Weight, or Volume).
+2. Enter the value to convert. Use numbers and one decimal point. No spaces or units in this field.
+3. Choose the "From" unit (the unit your value is in).
+4. Choose the "To" unit (the unit you want the result in).
+5. The result appears automatically. No button required in the basic version.
+
+PRECISION
+---------
+Results are shown to a sensible number of decimal places (usually 2–6 depending on size). Very large or very small numbers may be shown in scientific notation.
+
+SUPPORTED UNITS (LENGTH)
+------------------------
+Metres (m), Kilometres (km), Miles (mi), Feet (ft), Inches (in), Centimetres (cm), Yards (yd), Millimetres (mm).
+
+SUPPORTED UNITS (WEIGHT)
+------------------------
+Kilograms (kg), Grams (g), Pounds (lb), Ounces (oz), Stone (st), Milligrams (mg).
+
+SUPPORTED UNITS (VOLUME)
+------------------------
+Litres (L), Millilitres (mL), Gallons (gal), US Gallons (gal US), Fluid ounces (fl oz), Cups (cup), Tablespoons (tbsp), Teaspoons (tsp).
+
+LIMITS
+------
+- Maximum input length: 15 characters (including decimal point).
+- Only one category can be used at a time. To convert across categories (e.g. volume to weight), use a separate tool or lookup density.
+
+FUTURE
+------
+Planned: temperature (C, F, K), and possibly "copy result" and "swap units" buttons.

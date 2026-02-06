@@ -1,5 +1,6 @@
 import path from "node:path"
 import fs from "node:fs"
+import { GoogleAuth } from "google-auth-library"
 import { VertexAI } from "@google-cloud/vertexai"
 
 const GEMINI_MODEL = "gemini-2.5-flash"
@@ -33,6 +34,41 @@ function getProjectIdFromCredentials(credentials: Record<string, unknown>): stri
 
 let cachedVertex: VertexAI | null = null
 let cachedConfig: VertexConfig | null = null
+let cachedAuth: GoogleAuth | null = null
+
+function getCredentials(): Record<string, unknown> {
+  const credentialsJson = process.env.GCP_CREDENTIALS_JSON
+  if (credentialsJson) return JSON.parse(credentialsJson) as Record<string, unknown>
+  const keyPath = getCredentialsPath()
+  if (!keyPath || !fs.existsSync(keyPath)) {
+    throw new Error(
+      "GCP credentials not found. Set GCP_CREDENTIALS_JSON (Vercel) or add key file to project root."
+    )
+  }
+  return JSON.parse(fs.readFileSync(keyPath, "utf8")) as Record<string, unknown>
+}
+
+const CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
+
+/**
+ * Returns a GoogleAuth client with the same credentials as Vertex AI (for embedding API etc.).
+ * Uses cloud-platform scope so the access token is accepted by Vertex AI REST APIs (e.g. embeddings).
+ */
+export function getGoogleAuth(): GoogleAuth {
+  if (cachedAuth) return cachedAuth
+  const credentialsJson = process.env.GCP_CREDENTIALS_JSON
+  const scopes: string[] = [CLOUD_PLATFORM_SCOPE]
+  if (credentialsJson) {
+    cachedAuth = new GoogleAuth({
+      credentials: JSON.parse(credentialsJson) as Record<string, unknown>,
+      scopes,
+    })
+  } else {
+    const credentials = getCredentials()
+    cachedAuth = new GoogleAuth({ credentials, scopes })
+  }
+  return cachedAuth
+}
 
 /**
  * Returns a Vertex AI client with environment-aware credentials.
@@ -42,33 +78,8 @@ export function getVertexAI(): { vertex: VertexAI; config: VertexConfig } {
     return { vertex: cachedVertex, config: cachedConfig }
   }
 
-  const credentialsJson = process.env.GCP_CREDENTIALS_JSON
   const location = process.env.VERTEX_AI_LOCATION ?? DEFAULT_LOCATION
-
-  if (credentialsJson) {
-    const credentials = JSON.parse(credentialsJson) as Record<string, unknown>
-    const projectId = process.env.GCP_PROJECT_ID ?? getProjectIdFromCredentials(credentials)
-    const vertex = new VertexAI({
-      project: projectId,
-      location,
-      googleAuthOptions: { credentials },
-    })
-    cachedVertex = vertex
-    cachedConfig = { projectId, location }
-    return { vertex: cachedVertex, config: cachedConfig }
-  }
-
-  const keyPath = getCredentialsPath()
-  if (!keyPath) {
-    throw new Error(
-      "GCP credentials not found. Set GCP_CREDENTIALS_JSON (Vercel) or GOOGLE_APPLICATION_CREDENTIALS."
-    )
-  }
-  if (!fs.existsSync(keyPath)) {
-    throw new Error(`GCP key file not found at ${keyPath}. For Vercel, set GCP_CREDENTIALS_JSON.`)
-  }
-  const keyContent = fs.readFileSync(keyPath, "utf8")
-  const credentials = JSON.parse(keyContent) as Record<string, unknown>
+  const credentials = getCredentials()
   const projectId = process.env.GCP_PROJECT_ID ?? getProjectIdFromCredentials(credentials)
 
   const vertex = new VertexAI({
