@@ -35,7 +35,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No content to index" }, { status: 400 })
     }
 
-    const doc = await insertDocument(projectId, name, file.name)
+    const doc = await insertDocument(projectId, name, file.name, text)
 
     const batchSize = 5
     for (let i = 0; i < chunks.length; i += batchSize) {

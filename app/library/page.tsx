@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import Link from "next/link"
-import { Upload, FileText, Plus, ArrowLeft, Trash2, FolderOpen } from "lucide-react"
+import { Upload, FileText, Plus, ArrowLeft, Trash2, FolderOpen, X, Pencil } from "lucide-react"
 
 type Project = { id: string; name: string; slug: string; created_at: string }
 type Document = { id: string; project_id: string; name: string; file_name: string; created_at: string }
@@ -51,6 +51,14 @@ export default function LibraryPage() {
   const [creating, setCreating] = useState(false)
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
+  const [viewingDocument, setViewingDocument] = useState<{
+    id: string
+    name: string
+    content: string
+  } | null>(null)
+  const [editDraft, setEditDraft] = useState<string | null>(null)
+  const [savingContent, setSavingContent] = useState(false)
+  const [loadingContent, setLoadingContent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadTargetProjectIdRef = useRef<string | null>(null)
@@ -166,6 +174,49 @@ export default function LibraryPage() {
       setError(e instanceof Error ? e.message : "Failed to delete")
     } finally {
       setDeletingDocId(null)
+    }
+  }
+
+  const handleViewDocument = async (documentId: string) => {
+    setLoadingContent(true)
+    setError(null)
+    setEditDraft(null)
+    try {
+      const res = await fetch(`/api/documents/${documentId}/content`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to load content")
+      setViewingDocument({
+        id: documentId,
+        name: data.name || data.file_name || "Document",
+        content: data.content ?? "",
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load content")
+    } finally {
+      setLoadingContent(false)
+    }
+  }
+
+  const handleSaveDocumentContent = async () => {
+    if (!viewingDocument || editDraft === null) return
+    setSavingContent(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/documents/${viewingDocument.id}/content`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editDraft }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to save")
+      setViewingDocument((prev) =>
+        prev ? { ...prev, content: data.content ?? editDraft } : null,
+      )
+      setEditDraft(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save")
+    } finally {
+      setSavingContent(false)
     }
   }
 
@@ -321,9 +372,14 @@ export default function LibraryPage() {
                             className="flex items-center gap-2 text-sm border-b border-border/30 last:border-0 pb-1.5 last:pb-0"
                           >
                             <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                            <span className="truncate flex-1 min-w-0" title={d.name || d.file_name}>
+                            <button
+                              type="button"
+                              onClick={() => handleViewDocument(d.id)}
+                              className="truncate flex-1 min-w-0 text-left hover:text-primary hover:underline"
+                              title={`View: ${d.name || d.file_name}`}
+                            >
                               {d.name || d.file_name}
-                            </span>
+                            </button>
                             <span className="text-xs text-muted-foreground shrink-0">
                               {formatUploadTime(d.created_at)}
                             </span>
@@ -353,6 +409,99 @@ export default function LibraryPage() {
           </div>
         )}
       </main>
+
+      {/* Document content viewer modal */}
+      {viewingDocument && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+          onClick={() => {
+            if (editDraft === null) setViewingDocument(null)
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Document content"
+        >
+          <Card
+            className="flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+              <h3 className="font-semibold truncate pr-4">{viewingDocument.name}</h3>
+              <div className="flex items-center gap-1 shrink-0">
+                {editDraft === null ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setEditDraft(viewingDocument.content)}
+                    aria-label="Edit document"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="default"
+                      size="sm"
+                      onClick={handleSaveDocumentContent}
+                      disabled={savingContent}
+                    >
+                      {savingContent ? <Spinner className="w-4 h-4" /> : "Save"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setEditDraft(null)}
+                      disabled={savingContent}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setEditDraft(null)
+                    setViewingDocument(null)
+                  }}
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+            {editDraft === null ? (
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <div className="p-4">
+                  <pre className="text-sm text-foreground whitespace-pre-wrap break-words font-sans">
+                    {viewingDocument.content || "(No content)"}
+                  </pre>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 min-h-0 p-4 flex flex-col overflow-hidden">
+                <textarea
+                  value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  className="min-h-[200px] w-full flex-1 p-3 text-sm font-sans rounded-md border border-input bg-background text-foreground resize-none overflow-auto"
+                  placeholder="Document content..."
+                  spellCheck="false"
+                />
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {loadingContent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <Spinner className="w-8 h-8 text-primary" />
+        </div>
+      )}
     </div>
   )
 }

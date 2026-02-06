@@ -47,6 +47,12 @@ export async function initVectorSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `)
+  try {
+    await db.query("ALTER TABLE documents ADD COLUMN content TEXT")
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code
+    if (code !== "42701") throw e // 42701 = duplicate_column (already exists)
+  }
   await db.query(`
     CREATE TABLE IF NOT EXISTS document_chunks (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -109,6 +115,41 @@ export async function listDocuments(projectId: string): Promise<Document[]> {
   return rows as Document[]
 }
 
+/** Get document metadata and raw content. Uses stored content if present, else falls back to chunks. */
+export async function getDocumentContent(
+  documentId: string,
+): Promise<{ name: string; file_name: string; content: string } | null> {
+  const docRows = await getPool().query(
+    "SELECT name, file_name, content FROM documents WHERE id = $1 LIMIT 1",
+    [documentId],
+  )
+  const doc = docRows.rows[0] as { name: string; file_name: string; content: string | null } | undefined
+  if (!doc) return null
+  if (doc.content != null && doc.content !== "") {
+    return { name: doc.name, file_name: doc.file_name, content: doc.content }
+  }
+  const chunkRows = await getPool().query(
+    "SELECT content FROM document_chunks WHERE document_id = $1 ORDER BY id",
+    [documentId],
+  )
+  const content = (chunkRows.rows as { content: string }[]).map((r) => r.content).join("\n\n")
+  return { name: doc.name, file_name: doc.file_name, content }
+}
+
+/** Update document raw content. */
+export async function updateDocumentContent(documentId: string, content: string): Promise<boolean> {
+  const { rowCount } = await getPool().query(
+    "UPDATE documents SET content = $2 WHERE id = $1",
+    [documentId, content],
+  )
+  return (rowCount ?? 0) > 0
+}
+
+/** Delete all chunks for a document (used before re-indexing). */
+export async function deleteChunksByDocumentId(documentId: string): Promise<void> {
+  await getPool().query("DELETE FROM document_chunks WHERE document_id = $1", [documentId])
+}
+
 /** Delete a document and its chunks (cascade). Returns true if a row was deleted. */
 export async function deleteDocument(documentId: string): Promise<boolean> {
   const { rowCount } = await getPool().query("DELETE FROM documents WHERE id = $1", [documentId])
@@ -119,11 +160,12 @@ export async function insertDocument(
   projectId: string,
   name: string,
   fileName: string,
+  content?: string | null,
 ): Promise<Document> {
   const { rows } = await getPool().query(
-    `INSERT INTO documents (project_id, name, file_name) VALUES ($1, $2, $3)
+    `INSERT INTO documents (project_id, name, file_name, content) VALUES ($1, $2, $3, $4)
      RETURNING id, project_id, name, file_name, created_at`,
-    [projectId, name, fileName],
+    [projectId, name, fileName, content ?? null],
   )
   return rows[0] as Document
 }
