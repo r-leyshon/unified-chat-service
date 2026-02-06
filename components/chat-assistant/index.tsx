@@ -47,11 +47,9 @@ export default function ChatAssistant({
     <>
       <FloatingButton
         onClick={() => {
-          setIsOpen((prev) => {
-            const next = !prev
-            onEvent?.({ type: next ? "open" : "close" })
-            return next
-          })
+          const next = !isOpen
+          setIsOpen(next)
+          onEvent?.({ type: next ? "open" : "close" })
         }}
         isOpen={isOpen}
         theme={theme}

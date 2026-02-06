@@ -29,6 +29,15 @@ To learn more about Next.js, take a look at the following resources:
 
 You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
+## Chat assistant & Vertex AI (Gemini 2.5 Flash)
+
+Completions use **GCP Vertex AI Gemini 2.5 Flash**. Credentials are loaded in an environment-aware way:
+
+- **Local:** Place a GCP service account key JSON at the project root (e.g. `rich-experiments-6e037a3981c5.json`) or set `GOOGLE_APPLICATION_CREDENTIALS` to its path. Do not commit the key file (it is in `.gitignore`).
+- **Vercel:** Set the env var **`GCP_CREDENTIALS_JSON`** to the **full contents** of your service account JSON (paste the whole file as one string). Optionally set **`GCP_PROJECT_ID`** and **`VERTEX_AI_LOCATION`** (default `us-central1`).
+
+Enable the Vertex AI API for your GCP project and grant the service account appropriate Vertex AI permissions.
+
 ## Deploy on Vercel
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.

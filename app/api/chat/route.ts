@@ -1,57 +1,53 @@
+import { getGeminiModel } from "@/lib/vertex-ai"
+
 export async function POST(req: Request) {
   const body = await req.json()
-
-  // In a real app:
-  // - Validate user auth
-  // - Extract product_id from your app context
-  // - Call the central chat service
-
-  // For demo purposes, we'll stream a mock response
-  const mockResponse = {
-    type: "content",
-    content:
-      "This is a mock response from the central chat service. In production, this endpoint would proxy to your Python FastAPI backend, which handles RAG, document retrieval, and Azure OpenAI calls.",
+  const { messages } = body as {
+    product_id?: string
+    user?: { id?: string; name?: string }
+    messages?: Array<{ role: string; content: string }>
   }
 
-  const mockSources = {
-    type: "sources",
-    sources: [
-      {
-        title: "Getting Started Guide",
-        url: "https://docs.example.com/getting-started",
-      },
-      {
-        title: "API Reference",
-        url: "https://docs.example.com/api-reference",
-      },
-    ],
-  }
+  const model = getGeminiModel()
 
-  const mockDone = { type: "done" }
+  const contents = (messages ?? []).map((m: { role: string; content: string }) => ({
+    role: m.role === "user" ? "user" : "model",
+    parts: [{ text: m.content }],
+  }))
 
-  // Create a readable stream
   const stream = new ReadableStream({
-    start(controller) {
-      // Simulate streaming by sending chunks with delays
-      const chunks = [
-        `data: ${JSON.stringify(mockResponse)}\n\n`,
-        `data: ${JSON.stringify(mockSources)}\n\n`,
-        `data: ${JSON.stringify(mockDone)}\n\n`,
-      ]
-
-      let index = 0
-
-      const sendChunk = () => {
-        if (index < chunks.length) {
-          controller.enqueue(new TextEncoder().encode(chunks[index]))
-          index++
-          setTimeout(sendChunk, 300) // Simulate delay between chunks
-        } else {
-          controller.close()
+    async start(controller) {
+      const encoder = new TextEncoder()
+      try {
+        const streamingResult = await model.generateContentStream({
+          contents,
+        })
+        for await (const item of streamingResult.stream) {
+          const text = item.candidates?.[0]?.content?.parts?.[0]?.text
+          if (text) {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "content", content: text })}\n\n`),
+            )
+          }
         }
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "sources", sources: [] })}\n\n`),
+        )
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`))
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Vertex AI error"
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({ type: "content", content: `Error: ${message}` })}\n\n`,
+          ),
+        )
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify({ type: "sources", sources: [] })}\n\n`),
+        )
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`))
+      } finally {
+        controller.close()
       }
-
-      sendChunk()
     },
   })
 
