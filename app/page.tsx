@@ -1,103 +1,136 @@
-import Image from "next/image";
+"use client"
+
+import { useState } from "react"
+import ChatAssistant from "@/components/chat-assistant"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [displayMode, setDisplayMode] = useState<"floating" | "inline">("floating")
+  const [events, setEvents] = useState<Array<{ type: string; time: string }>>([])
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleEvent = (event: { type: string; payload?: unknown }) => {
+    const now = new Date().toLocaleTimeString()
+    setEvents((prev) => [{ type: `${event.type}`, time: now }, ...prev.slice(0, 19)])
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
+      {/* Header */}
+      <header className="border-b border-border/50 backdrop-blur-sm sticky top-0 z-30">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <h1 className="text-4xl font-bold text-foreground mb-2">Unified Chat Assistant</h1>
+          <p className="text-muted-foreground">A frontend component library + central service for in-product AI chat</p>
         </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Demo */}
+          <div className="lg:col-span-2">
+            <Card className="p-8 bg-gradient-to-br from-card to-card/50 border-border/50">
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-foreground mb-2">Chat Assistant Demo</h2>
+                <p className="text-sm text-muted-foreground">
+                  Try the chat widget. Switch between floating and inline modes to see how it adapts.
+                </p>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="flex gap-3 mb-8">
+                <Button
+                  variant={displayMode === "floating" ? "default" : "outline"}
+                  onClick={() => setDisplayMode("floating")}
+                >
+                  Floating Mode
+                </Button>
+                <Button
+                  variant={displayMode === "inline" ? "default" : "outline"}
+                  onClick={() => setDisplayMode("inline")}
+                >
+                  Inline Mode
+                </Button>
+              </div>
+
+              {/* Chat Component */}
+              {displayMode === "inline" && (
+                <div className="border border-border/50 rounded-lg overflow-hidden bg-background/50">
+                  <ChatAssistant
+                    apiUrl="/api/chat"
+                    productId="demo-product"
+                    user={{
+                      id: "demo-user-123",
+                      name: "Demo User",
+                      email: "demo@example.com",
+                    }}
+                    displayMode="inline"
+                    showSources={true}
+                    maxMessages={50}
+                    placeholder="Ask me anything about the product..."
+                    title="Product Assistant"
+                    subtitle="Powered by AI"
+                    theme={{
+                      primaryColor: "#3b82f6",
+                      accentColor: "#10b981",
+                    }}
+                    onEvent={handleEvent}
+                  />
+                </div>
+              )}
+
+              {displayMode === "floating" && (
+                <div className="p-12 text-center text-muted-foreground border border-dashed border-border rounded-lg">
+                  <p className="text-sm">Look for the chat button in the bottom-right corner</p>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Event Log */}
+          <div className="lg:col-span-1">
+            <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-border/50 sticky top-24">
+              <h3 className="text-lg font-semibold text-foreground mb-4">Event Log</h3>
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {events.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No events yet. Try sending a message!</p>
+                ) : (
+                  events.map((event, idx) => (
+                    <div key={idx} className="text-xs p-2 rounded bg-secondary/50 border border-border/50">
+                      <span className="font-mono text-primary">{event.type}</span>
+                      <br />
+                      <span className="text-muted-foreground">{event.time}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
+        </div>
+
+        {/* Floating Chat */}
+        {displayMode === "floating" && (
+          <ChatAssistant
+            apiUrl="/api/chat"
+            productId="demo-product"
+            user={{
+              id: "demo-user-123",
+              name: "Demo User",
+              email: "demo@example.com",
+            }}
+            displayMode="floating"
+            showSources={true}
+            maxMessages={50}
+            placeholder="Ask me anything..."
+            title="Product Assistant"
+            subtitle="Powered by AI"
+            theme={{
+              primaryColor: "#3b82f6",
+              accentColor: "#10b981",
+            }}
+            onEvent={handleEvent}
+          />
+        )}
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }
