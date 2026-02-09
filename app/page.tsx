@@ -1,14 +1,30 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import ChatAssistant from "@/components/chat-assistant"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+
+type Project = { id: string; name: string; slug: string; description?: string | null }
 
 export default function Home() {
   const [displayMode, setDisplayMode] = useState<"floating" | "inline">("floating")
   const [events, setEvents] = useState<Array<{ type: string; time: string }>>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("")
+  const [projectsLoading, setProjectsLoading] = useState(true)
+
+  useEffect(() => {
+    fetch("/api/projects")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setProjects(data)
+      })
+      .catch(() => {})
+      .finally(() => setProjectsLoading(false))
+  }, [])
 
   const handleEvent = (event: { type: string; payload?: unknown }) => {
     const now = new Date().toLocaleTimeString()
@@ -39,7 +55,38 @@ export default function Home() {
                 <h2 className="text-2xl font-semibold text-foreground mb-2">Chat Assistant Demo</h2>
                 <p className="text-sm text-muted-foreground">
                   Try the chat widget. Switch between floating and inline modes to see how it adapts.
+                  Select a project to test chat as if from that product (RAG uses that project&apos;s docs).
                 </p>
+              </div>
+
+              {/* Project selector: simulates consumer app passing product_id */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Chat as product (product_id)
+                </label>
+                {projectsLoading ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <Spinner className="w-4 h-4" /> Loading projects…
+                  </div>
+                ) : (
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => setSelectedProjectId(e.target.value)}
+                    className="w-full max-w-sm rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">No project (no RAG)</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {selectedProjectId && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    product_id = <code className="bg-secondary px-1 rounded">{selectedProjectId}</code>
+                  </p>
+                )}
               </div>
 
               {/* Mode Toggle */}
@@ -63,7 +110,7 @@ export default function Home() {
                 <div className="border border-border/50 rounded-lg overflow-hidden bg-background/50">
                   <ChatAssistant
                     apiUrl="/api/chat"
-                    productId="demo-product"
+                    productId={selectedProjectId}
                     user={{
                       id: "demo-user-123",
                       name: "Demo User",
@@ -117,7 +164,7 @@ export default function Home() {
         {displayMode === "floating" && (
           <ChatAssistant
             apiUrl="/api/chat"
-            productId="demo-product"
+            productId={selectedProjectId}
             user={{
               id: "demo-user-123",
               name: "Demo User",

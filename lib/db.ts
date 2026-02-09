@@ -15,6 +15,7 @@ export type Project = {
   id: string
   name: string
   slug: string
+  description: string | null
   created_at: Date
 }
 
@@ -38,6 +39,12 @@ export async function initVectorSchema() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `)
+  try {
+    await db.query("ALTER TABLE projects ADD COLUMN description TEXT")
+  } catch (e: unknown) {
+    const code = (e as { code?: string })?.code
+    if (code !== "42701") throw e
+  }
   await db.query(`
     CREATE TABLE IF NOT EXISTS documents (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -66,27 +73,29 @@ export async function initVectorSchema() {
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const { rows } = await getPool().query("SELECT id, name, slug, created_at FROM projects ORDER BY name")
+  const { rows } = await getPool().query(
+    "SELECT id, name, slug, description, created_at FROM projects ORDER BY name",
+  )
   return rows as Project[]
 }
 
-export async function createProject(name: string): Promise<Project> {
+export async function createProject(name: string, description?: string | null): Promise<Project> {
   const slug = name
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "")
   const { rows } = await getPool().query(
-    `INSERT INTO projects (name, slug) VALUES ($1, $2)
-     ON CONFLICT (slug) DO UPDATE SET name = $1
-     RETURNING id, name, slug, created_at`,
-    [name, slug],
+    `INSERT INTO projects (name, slug, description) VALUES ($1, $2, $3)
+     ON CONFLICT (slug) DO UPDATE SET name = $1, description = $3
+     RETURNING id, name, slug, description, created_at`,
+    [name, slug, description ?? null],
   )
   return rows[0] as Project
 }
 
 export async function getProjectBySlug(slug: string): Promise<Project | null> {
   const { rows } = await getPool().query(
-    "SELECT id, name, slug, created_at FROM projects WHERE slug = $1 LIMIT 1",
+    "SELECT id, name, slug, description, created_at FROM projects WHERE slug = $1 LIMIT 1",
     [slug],
   )
   return (rows[0] as Project) ?? null
@@ -94,10 +103,21 @@ export async function getProjectBySlug(slug: string): Promise<Project | null> {
 
 export async function getProjectById(id: string): Promise<Project | null> {
   const { rows } = await getPool().query(
-    "SELECT id, name, slug, created_at FROM projects WHERE id = $1 LIMIT 1",
+    "SELECT id, name, slug, description, created_at FROM projects WHERE id = $1 LIMIT 1",
     [id],
   )
   return (rows[0] as Project) ?? null
+}
+
+export async function updateProjectDescription(
+  projectId: string,
+  description: string | null,
+): Promise<boolean> {
+  const { rowCount } = await getPool().query(
+    "UPDATE projects SET description = $2 WHERE id = $1",
+    [projectId, description],
+  )
+  return (rowCount ?? 0) > 0
 }
 
 /** Delete a project and all its documents and chunks (cascade). Returns true if a row was deleted. */

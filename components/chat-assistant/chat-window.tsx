@@ -46,6 +46,7 @@ export default function ChatWindow({
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [currentSources, setCurrentSources] = useState<ChatResponse["sources"]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -70,6 +71,7 @@ export default function ChatWindow({
     onEvent?.({ type: "message_sent", payload: { content: userMessage } })
 
     setIsLoading(true)
+    setStatusMessage(null)
 
     try {
       // Create assistant placeholder message
@@ -115,7 +117,10 @@ export default function ChatWindow({
             try {
               const data = JSON.parse(line.slice(6))
 
-              if (data.type === "content") {
+              if (data.type === "status") {
+                setStatusMessage(data.message ?? "Looking up guidance…")
+              } else if (data.type === "content") {
+                setStatusMessage(null)
                 fullAnswer += data.content
                 // Update message with streamed content
                 setMessages((prev) => {
@@ -129,6 +134,7 @@ export default function ChatWindow({
                 sources = data.sources
                 setCurrentSources(sources)
               } else if (data.type === "done") {
+                setStatusMessage(null)
                 onEvent?.({
                   type: "message_received",
                   payload: { answer: fullAnswer, sources },
@@ -157,6 +163,7 @@ export default function ChatWindow({
       ])
     } finally {
       setIsLoading(false)
+      setStatusMessage(null)
     }
   }
 
@@ -205,7 +212,9 @@ export default function ChatWindow({
                 <div className="flex justify-start">
                   <div className="flex gap-2 items-center px-3 py-2 rounded-lg bg-secondary/50">
                     <Spinner className="w-4 h-4" />
-                    <span className="text-xs text-muted-foreground">Thinking...</span>
+                    <span className="text-xs text-muted-foreground">
+                      {statusMessage || "Thinking…"}
+                    </span>
                   </div>
                 </div>
               )}

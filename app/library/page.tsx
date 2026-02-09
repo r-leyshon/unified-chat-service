@@ -6,9 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import Link from "next/link"
-import { Upload, FileText, Plus, ArrowLeft, Trash2, FolderOpen, X, Pencil } from "lucide-react"
+import { Upload, FileText, Plus, ArrowLeft, Trash2, FolderOpen, X, Pencil, Copy } from "lucide-react"
 
-type Project = { id: string; name: string; slug: string; created_at: string }
+type Project = {
+  id: string
+  name: string
+  slug: string
+  description?: string | null
+  created_at: string
+}
 type Document = { id: string; project_id: string; name: string; file_name: string; created_at: string }
 
 function dedupeProjectsById(projects: Project[]): Project[] {
@@ -59,6 +65,8 @@ export default function LibraryPage() {
   const [editDraft, setEditDraft] = useState<string | null>(null)
   const [savingContent, setSavingContent] = useState(false)
   const [loadingContent, setLoadingContent] = useState(false)
+  const [descriptionEdits, setDescriptionEdits] = useState<Record<string, string>>({})
+  const [savingDescriptionProjectId, setSavingDescriptionProjectId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadTargetProjectIdRef = useRef<string | null>(null)
@@ -197,6 +205,37 @@ export default function LibraryPage() {
     }
   }
 
+  const handleCopyProjectId = (projectId: string) => {
+    navigator.clipboard.writeText(projectId).catch(() => {})
+  }
+
+  const handleSaveDescription = async (projectId: string) => {
+    const value = descriptionEdits[projectId] ?? projects.find((p) => p.id === projectId)?.description ?? ""
+    setSavingDescriptionProjectId(projectId)
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: value || null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to save description")
+      setProjects((prev) =>
+        prev.map((p) => (p.id === projectId ? { ...p, description: value || null } : p)),
+      )
+      setDescriptionEdits((prev) => {
+        const next = { ...prev }
+        delete next[projectId]
+        return next
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save description")
+    } finally {
+      setSavingDescriptionProjectId(null)
+    }
+  }
+
   const handleSaveDocumentContent = async () => {
     if (!viewingDocument || editDraft === null) return
     setSavingContent(true)
@@ -324,7 +363,7 @@ export default function LibraryPage() {
               const isDeleting = deletingProjectId === project.id
               return (
                 <Card key={project.id} className="p-4 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <h2 className="font-semibold text-foreground truncate flex-1" title={project.name}>
                       {project.name}
                     </h2>
@@ -357,6 +396,54 @@ export default function LibraryPage() {
                           <Spinner className="w-4 h-4" />
                         ) : (
                           <Trash2 className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Project UUID (product_id) for consuming apps */}
+                  <div className="mb-2 flex items-center gap-1.5">
+                    <code className="text-xs text-muted-foreground truncate flex-1 min-w-0" title={project.id}>
+                      {project.id}
+                    </code>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      onClick={() => handleCopyProjectId(project.id)}
+                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      aria-label="Copy project ID"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  {/* Short description for RAG search-term extraction */}
+                  <div className="mb-3">
+                    <label className="block text-xs text-muted-foreground mb-1">Description (for chat)</label>
+                    <div className="flex gap-1">
+                      <Input
+                        value={descriptionEdits[project.id] ?? project.description ?? ""}
+                        onChange={(e) =>
+                          setDescriptionEdits((prev) => ({ ...prev, [project.id]: e.target.value }))
+                        }
+                        placeholder="Short description for this product"
+                        className="text-xs h-8"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 h-8 text-xs"
+                        disabled={
+                          savingDescriptionProjectId === project.id ||
+                          (descriptionEdits[project.id] ?? project.description ?? "") ===
+                            (project.description ?? "")
+                        }
+                        onClick={() => handleSaveDescription(project.id)}
+                      >
+                        {savingDescriptionProjectId === project.id ? (
+                          <Spinner className="w-3.5 h-3.5" />
+                        ) : (
+                          "Save"
                         )}
                       </Button>
                     </div>
