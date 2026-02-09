@@ -1,9 +1,7 @@
 import { getProjectById, getProjectDocumentationContent } from "@/lib/db"
+import { SUMMARY_PROMPT } from "@/lib/prompts"
 import { getGeminiModel } from "@/lib/vertex-ai"
 import { NextResponse } from "next/server"
-
-const SUMMARY_PROMPT = `Summarize the following product documentation in a single sentence that gives an overview of what the product is and what it does.
-Output only that one sentence, no quotes, no preamble, no "Summary:" label.`
 
 export async function POST(
   _req: Request,

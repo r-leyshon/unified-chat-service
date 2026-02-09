@@ -1,11 +1,11 @@
 import { getGeminiModel } from "@/lib/vertex-ai"
 import { getProjectById, searchChunks } from "@/lib/db"
 import { embedText } from "@/lib/embeddings"
-
-const EXTRACTION_SYSTEM = `You help identify whether a user message is asking about a specific product so we can look up documentation.
-You are given the current product's name and optional description.
-Your job: output a JSON array of 1 or more search terms (strings) that would find relevant documentation, OR an empty array [] if the message is chit-chat, greeting, unrelated, or not about this product.
-Reply with ONLY the JSON array, no other text. Example: ["unit conversion", "length"] or []`
+import {
+  EXTRACTION_SYSTEM,
+  buildExtractionUserMessage,
+  buildChatAssistantSystemInstruction,
+} from "@/lib/prompts"
 
 function parseSearchTerms(raw: string): string[] {
   const trimmed = raw?.trim() || ""
@@ -51,13 +51,11 @@ export async function POST(req: Request) {
         if (productId && lastUserText.trim()) {
           const project = await getProjectById(productId)
           if (project) {
-            const extractionPrompt = `Product name: ${project.name}
-${project.description ? `Product description: ${project.description}` : ""}
-
-User message: ${lastUserText}
-
-Output a JSON array of search terms (or [] if not about this product):`
-
+            const extractionPrompt = buildExtractionUserMessage(
+              project.name,
+              project.description,
+              lastUserText,
+            )
             try {
               const extractionResult = await model.generateContent({
                 contents: [{ role: "user", parts: [{ text: extractionPrompt }] }],
@@ -95,11 +93,7 @@ Output a JSON array of search terms (or [] if not about this product):`
           }
         }
 
-        const baseSystem =
-          "You are a helpful product assistant. Answer concisely and accurately. If you are given context from documentation, use it to answer; if the context does not contain the answer, say so."
-        const systemInstruction = contextBlock
-          ? `${baseSystem}\n\nUse the following context from the product documentation when answering. If the context does not contain the answer, say so.\n\nContext:\n${contextBlock}`
-          : baseSystem
+        const systemInstruction = buildChatAssistantSystemInstruction(contextBlock)
 
         const streamingResult = await model.generateContentStream({
           contents,
