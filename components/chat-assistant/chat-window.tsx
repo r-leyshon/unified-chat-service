@@ -9,7 +9,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Spinner } from "@/components/ui/spinner"
 import type { ChatMessage, ChatResponse, ChatTheme } from "@/lib/chat-types"
 import MessageBubble from "./message-bubble"
-import SourcesPanel from "./sources-panel"
 import { Send, X } from "lucide-react"
 
 interface ChatWindowProps {
@@ -47,7 +46,6 @@ export default function ChatWindow({
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
-  const [currentSources, setCurrentSources] = useState<ChatResponse["sources"]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to latest message
@@ -134,7 +132,6 @@ export default function ChatWindow({
                 })
               } else if (data.type === "sources") {
                 sources = data.sources
-                setCurrentSources(sources)
               } else if (data.type === "done") {
                 setStatusMessage(null)
                 onEvent?.({
@@ -225,9 +222,6 @@ export default function ChatWindow({
           )}
         </div>
       </ScrollArea>
-
-      {/* Sources Section */}
-      {showSources && currentSources && currentSources.length > 0 && <SourcesPanel sources={currentSources} />}
 
       {/* Input Area */}
       <div className="p-4 border-t border-border bg-gradient-to-t from-background to-background">
