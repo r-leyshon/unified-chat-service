@@ -70,6 +70,7 @@ export async function POST(req: Request) {
                 JSON.stringify(searchTerms),
               )
               if (searchTerms.length >= 1) {
+                enqueue(controller, { type: "search", searchTerms })
                 enqueue(controller, { type: "status", message: "Looking up guidance…" })
                 const query = searchTerms.join(" ")
                 const queryEmbedding = await embedText(query)

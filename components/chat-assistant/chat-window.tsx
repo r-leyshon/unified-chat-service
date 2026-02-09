@@ -119,6 +119,8 @@ export default function ChatWindow({
 
               if (data.type === "status") {
                 setStatusMessage(data.message ?? "Looking up guidance…")
+              } else if (data.type === "search" && Array.isArray(data.searchTerms)) {
+                onEvent?.({ type: "search", payload: { searchTerms: data.searchTerms } })
               } else if (data.type === "content") {
                 setStatusMessage(null)
                 fullAnswer += data.content

@@ -11,7 +11,7 @@ type Project = { id: string; name: string; slug: string; description?: string | 
 
 export default function Home() {
   const [displayMode, setDisplayMode] = useState<"floating" | "inline">("floating")
-  const [events, setEvents] = useState<Array<{ type: string; time: string }>>([])
+  const [events, setEvents] = useState<Array<{ type: string; time: string; payload?: unknown }>>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -28,7 +28,7 @@ export default function Home() {
 
   const handleEvent = (event: { type: string; payload?: unknown }) => {
     const now = new Date().toLocaleTimeString()
-    setEvents((prev) => [{ type: `${event.type}`, time: now }, ...prev.slice(0, 19)])
+    setEvents((prev) => [{ type: event.type, time: now, payload: event.payload }, ...prev.slice(0, 19)])
   }
 
   return (
@@ -149,7 +149,15 @@ export default function Home() {
                 ) : (
                   events.map((event, idx) => (
                     <div key={idx} className="text-xs p-2 rounded bg-secondary/50 border border-border/50">
-                      <span className="font-mono text-primary">{event.type}</span>
+                      <span className="font-mono text-primary">
+                        {event.type === "search" &&
+                        event.payload &&
+                        typeof event.payload === "object" &&
+                        "searchTerms" in event.payload &&
+                        Array.isArray(event.payload.searchTerms)
+                          ? `search: ${(event.payload.searchTerms as string[]).join(", ")}`
+                          : event.type}
+                      </span>
                       <br />
                       <span className="text-muted-foreground">{event.time}</span>
                     </div>

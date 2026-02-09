@@ -30,7 +30,7 @@ export interface ChatTheme {
 export type DisplayMode = "floating" | "inline"
 
 export interface ChatAssistantEvent {
-  type: "open" | "close" | "message_sent" | "message_received" | "error"
+  type: "open" | "close" | "message_sent" | "message_received" | "search" | "error"
   payload?: unknown
 }
 
