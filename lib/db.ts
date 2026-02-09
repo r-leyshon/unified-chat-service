@@ -135,6 +135,19 @@ export async function listDocuments(projectId: string): Promise<Document[]> {
   return rows as Document[]
 }
 
+/** Get concatenated raw content of all documents in a project (for summarization). */
+export async function getProjectDocumentationContent(projectId: string): Promise<string> {
+  const docs = await listDocuments(projectId)
+  const parts: string[] = []
+  for (const d of docs) {
+    const result = await getDocumentContent(d.id)
+    if (result?.content) {
+      parts.push(`[${result.name}]\n${result.content}`)
+    }
+  }
+  return parts.join("\n\n---\n\n")
+}
+
 /** Get document metadata and raw content. Uses stored content if present, else falls back to chunks. */
 export async function getDocumentContent(
   documentId: string,

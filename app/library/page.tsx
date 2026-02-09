@@ -6,7 +6,23 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import Link from "next/link"
-import { Upload, FileText, Plus, ArrowLeft, Trash2, FolderOpen, X, Pencil, Copy } from "lucide-react"
+import {
+  Upload,
+  FileText,
+  Plus,
+  ArrowLeft,
+  Trash2,
+  FolderOpen,
+  X,
+  Pencil,
+  Copy,
+  Sparkles,
+} from "lucide-react"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 
 type Project = {
   id: string
@@ -67,6 +83,9 @@ export default function LibraryPage() {
   const [loadingContent, setLoadingContent] = useState(false)
   const [descriptionEdits, setDescriptionEdits] = useState<Record<string, string>>({})
   const [savingDescriptionProjectId, setSavingDescriptionProjectId] = useState<string | null>(null)
+  const [generatingDescriptionProjectId, setGeneratingDescriptionProjectId] = useState<string | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadTargetProjectIdRef = useRef<string | null>(null)
@@ -207,6 +226,24 @@ export default function LibraryPage() {
 
   const handleCopyProjectId = (projectId: string) => {
     navigator.clipboard.writeText(projectId).catch(() => {})
+  }
+
+  const handleGenerateDescription = async (projectId: string) => {
+    setGeneratingDescriptionProjectId(projectId)
+    setError(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/generate-description`, {
+        method: "POST",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || "Failed to generate description")
+      const description = typeof data.description === "string" ? data.description : ""
+      setDescriptionEdits((prev) => ({ ...prev, [projectId]: description }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate description")
+    } finally {
+      setGeneratingDescriptionProjectId(null)
+    }
   }
 
   const handleSaveDescription = async (projectId: string) => {
@@ -357,13 +394,15 @@ export default function LibraryPage() {
             </Button>
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-6 max-h-[calc(100vh-11rem)] overflow-y-auto pr-2">
             {projects.map((project) => {
               const docs = documentsByProject[project.id] ?? []
               const isDeleting = deletingProjectId === project.id
+              const descriptionText =
+                descriptionEdits[project.id] ?? project.description ?? ""
               return (
-                <Card key={project.id} className="p-4 flex flex-col">
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                <Card key={project.id} className="p-5 flex flex-col min-h-0 shrink-0">
+                  <div className="flex items-start justify-between gap-2 mb-3">
                     <h2 className="font-semibold text-foreground truncate flex-1" title={project.name}>
                       {project.name}
                     </h2>
@@ -401,7 +440,7 @@ export default function LibraryPage() {
                     </div>
                   </div>
                   {/* Project UUID (product_id) for consuming apps */}
-                  <div className="mb-2 flex items-center gap-1.5">
+                  <div className="mb-3 flex items-center gap-1.5">
                     <code className="text-xs text-muted-foreground truncate flex-1 min-w-0" title={project.id}>
                       {project.id}
                     </code>
@@ -416,18 +455,65 @@ export default function LibraryPage() {
                       <Copy className="w-3.5 h-3.5" />
                     </Button>
                   </div>
-                  {/* Short description for RAG search-term extraction */}
-                  <div className="mb-3">
-                    <label className="block text-xs text-muted-foreground mb-1">Description (for chat)</label>
-                    <div className="flex gap-1">
-                      <Input
-                        value={descriptionEdits[project.id] ?? project.description ?? ""}
-                        onChange={(e) =>
-                          setDescriptionEdits((prev) => ({ ...prev, [project.id]: e.target.value }))
-                        }
-                        placeholder="Short description for this product"
-                        className="text-xs h-8"
-                      />
+                  {/* Description with hover to see full text */}
+                  <div className="mb-4">
+                    <label className="block text-xs text-muted-foreground mb-1">Description</label>
+                    <div className="flex gap-2 flex-wrap items-center">
+                      {descriptionText ? (
+                        <HoverCard openDelay={200} closeDelay={100}>
+                          <HoverCardTrigger asChild>
+                            <div className="flex-1 min-w-[200px] cursor-default">
+                              <Input
+                                value={descriptionText}
+                                onChange={(e) =>
+                                  setDescriptionEdits((prev) => ({
+                                    ...prev,
+                                    [project.id]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Short description for this product"
+                                className="text-xs h-8 w-full"
+                              />
+                            </div>
+                          </HoverCardTrigger>
+                          <HoverCardContent
+                            className="w-full max-w-md max-h-[16rem] overflow-y-auto"
+                            side="bottom"
+                            align="start"
+                          >
+                            <p className="text-sm whitespace-pre-wrap break-words">
+                              {descriptionText}
+                            </p>
+                          </HoverCardContent>
+                        </HoverCard>
+                      ) : (
+                        <Input
+                          value={descriptionText}
+                          onChange={(e) =>
+                            setDescriptionEdits((prev) => ({
+                              ...prev,
+                              [project.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="Short description for this product"
+                          className="text-xs h-8 flex-1 min-w-[200px]"
+                        />
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0 h-8 w-8"
+                        disabled={generatingDescriptionProjectId === project.id}
+                        onClick={() => handleGenerateDescription(project.id)}
+                        aria-label="Generate description from docs"
+                      >
+                        {generatingDescriptionProjectId === project.id ? (
+                          <Spinner className="w-4 h-4" />
+                        ) : (
+                          <Sparkles className="w-4 h-4" />
+                        )}
+                      </Button>
                       <Button
                         type="button"
                         variant="outline"
