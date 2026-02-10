@@ -4,7 +4,9 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev": "npm run dev -w apps/unified-chat-service",
-    "dev:pomodoro": "npm run dev -w apps/minimal-pomodoro"
+    "dev:pomodoro": "npm run dev -w apps/minimal-pomodoro",
+    "dev:unit-converter": "npm run dev -w apps/unit-converter",
+    "dev:tip-calculator": "npm run dev -w apps/tip-calculator"
   },
   "workspaces": [
     "apps/*",

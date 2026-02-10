@@ -7,6 +7,8 @@ Monorepo for the **Unified Chat** service (API + document library + demo) and co
 - **`packages/unified-chat`** — Self-contained React chat component and types. Consumer apps depend on this package.
 - **`apps/unified-chat-service`** — Next.js app: chat API, document library (`/library`), and demo page. This is the “backend” and admin UI.
 - **`apps/minimal-pomodoro`** — Example consumer app: minimal Pomodoro timer + floating chat that calls the service.
+- **`apps/unit-converter`** — Unit converter (length) + floating chat. Default styling.
+- **`apps/tip-calculator`** — Tip calculator with light/dark mode + floating chat.
 
 ## Getting started
 
@@ -14,8 +16,10 @@ From the repo root:
 
 ```bash
 npm install
-npm run dev          # runs the chat service on http://localhost:3000
-npm run dev:pomodoro # runs Minimal Pomodoro on http://localhost:3001
+npm run dev              # runs the chat service on http://localhost:3000
+npm run dev:pomodoro     # Minimal Pomodoro on http://localhost:3001
+npm run dev:unit-converter  # Unit Converter on http://localhost:3002
+npm run dev:tip-calculator  # Tip Calculator on http://localhost:3003
 ```
 
 To run the service you need Postgres and (for RAG) GCP Vertex AI. See below.
@@ -23,7 +27,7 @@ To run the service you need Postgres and (for RAG) GCP Vertex AI. See below.
 ## Chat service (`apps/unified-chat-service`)
 
 - **Local:** `npm run dev` from root (or `cd apps/unified-chat-service && npm run dev`). Opens [http://localhost:3000](http://localhost:3000): demo page + `/library` for projects and document uploads.
-- **Env:** Create `apps/unified-chat-service/.env.local` with `POSTGRES_URL` and (optional) GCP credentials. For **CORS** (when a consumer app on another origin calls the API), set **`ALLOWED_ORIGINS`** to a comma-separated list, e.g. `http://localhost:3001,https://minimal-pomodoro.vercel.app`.
+- **Env:** Create `apps/unified-chat-service/.env.local` with `POSTGRES_URL` and (optional) GCP credentials. For **CORS** (when a consumer app on another origin calls the API), set **`ALLOWED_ORIGINS`** to a comma-separated list, e.g. `http://localhost:3001,http://localhost:3002,http://localhost:3003,https://minimal-pomodoro.vercel.app`.
 
 ### GCP Vertex AI (Gemini)
 
@@ -45,10 +49,20 @@ Example consumer app: work/break timer and a floating chat that uses the unified
 
 If these are not set, the timer still works; the chat widget is simply not rendered.
 
+## Unit Converter (`apps/unit-converter`)
+
+- **Local:** `npm run dev:unit-converter` from root. Opens [http://localhost:3002](http://localhost:3002). Default (neutral) styling.
+- **Env (optional):** In `apps/unit-converter/.env.local` set **`NEXT_PUBLIC_CHAT_SERVICE_URL`** and **`NEXT_PUBLIC_UNIT_CONVERTER_PRODUCT_ID`** (create a project in `/library` and copy its ID). Add `http://localhost:3002` to the service **`ALLOWED_ORIGINS`** for CORS.
+
+## Tip Calculator (`apps/tip-calculator`)
+
+- **Local:** `npm run dev:tip-calculator` from root. Opens [http://localhost:3003](http://localhost:3003). Toggle light/dark mode in the top-right; the app and chat widget both follow the theme via CSS variables.
+- **Env (optional):** In `apps/tip-calculator/.env.local` set **`NEXT_PUBLIC_CHAT_SERVICE_URL`** and **`NEXT_PUBLIC_TIP_CALCULATOR_PRODUCT_ID`**. Add `http://localhost:3003` to the service **`ALLOWED_ORIGINS`**.
+
 ## Deploying to Vercel
 
 - **Chat service:** Create a Vercel project with **Root Directory** = `apps/unified-chat-service`. Set env vars (e.g. `POSTGRES_URL`, `GCP_CREDENTIALS_JSON`, `ALLOWED_ORIGINS`).
-- **Minimal Pomodoro:** Create another Vercel project with **Root Directory** = `apps/minimal-pomodoro`. Set `NEXT_PUBLIC_CHAT_SERVICE_URL` and `NEXT_PUBLIC_POMODORO_PRODUCT_ID`, and add the service URL to the service app’s `ALLOWED_ORIGINS`.
+- **Consumer apps:** Create Vercel projects with **Root Directory** = `apps/minimal-pomodoro`, `apps/unit-converter`, or `apps/tip-calculator`. Set the app’s `NEXT_PUBLIC_CHAT_SERVICE_URL` and product ID env var (`NEXT_PUBLIC_POMODORO_PRODUCT_ID`, `NEXT_PUBLIC_UNIT_CONVERTER_PRODUCT_ID`, or `NEXT_PUBLIC_TIP_CALCULATOR_PRODUCT_ID`), and add each app’s origin to the service **`ALLOWED_ORIGINS`**.
 
 ## Using the chat widget in your app
 
