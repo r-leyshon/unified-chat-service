@@ -16,6 +16,7 @@ import {
   X,
   Pencil,
   Copy,
+  Check,
   Sparkles,
 } from "lucide-react"
 import {
@@ -86,9 +87,11 @@ export default function LibraryPage() {
   const [generatingDescriptionProjectId, setGeneratingDescriptionProjectId] = useState<string | null>(
     null,
   )
+  const [copiedProjectId, setCopiedProjectId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const uploadTargetProjectIdRef = useRef<string | null>(null)
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const loadProjects = async () => {
     try {
@@ -225,7 +228,14 @@ export default function LibraryPage() {
   }
 
   const handleCopyProjectId = (projectId: string) => {
-    navigator.clipboard.writeText(projectId).catch(() => {})
+    navigator.clipboard.writeText(projectId).then(() => {
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current)
+      setCopiedProjectId(projectId)
+      copiedTimeoutRef.current = setTimeout(() => {
+        setCopiedProjectId(null)
+        copiedTimeoutRef.current = null
+      }, 2000)
+    }).catch(() => {})
   }
 
   const handleGenerateDescription = async (projectId: string) => {
@@ -449,10 +459,14 @@ export default function LibraryPage() {
                       variant="ghost"
                       size="icon-xs"
                       onClick={() => handleCopyProjectId(project.id)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                      aria-label="Copy project ID"
+                      className={`shrink-0 ${copiedProjectId === project.id ? "text-green-600" : "text-muted-foreground hover:text-foreground"}`}
+                      aria-label={copiedProjectId === project.id ? "Copied" : "Copy project ID"}
                     >
-                      <Copy className="w-3.5 h-3.5" />
+                      {copiedProjectId === project.id ? (
+                        <Check className="w-3.5 h-3.5" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
                     </Button>
                   </div>
                   {/* Description with hover to see full text */}
