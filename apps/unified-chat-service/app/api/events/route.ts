@@ -39,14 +39,20 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const { productId, productName, type, payload } = body
-    if (!productId || !type) {
+    if (!type || typeof type !== "string") {
       return Response.json(
-        { error: "productId and type required" },
+        { error: "type (string) required" },
         { status: 400, headers }
       )
     }
     const time = new Date().toISOString()
-    store.push({ productId, productName, type, payload, time })
+    store.push({
+      productId: typeof productId === "string" ? productId : "",
+      productName: typeof productName === "string" ? productName : undefined,
+      type,
+      payload,
+      time,
+    })
     while (store.length > MAX_EVENTS) store.shift()
     return Response.json({ ok: true }, { status: 201, headers })
   } catch {

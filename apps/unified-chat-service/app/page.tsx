@@ -89,7 +89,7 @@ export default function Home() {
         .catch(() => {})
     }
     fetchRemote()
-    const t = setInterval(fetchRemote, 8000)
+    const t = setInterval(fetchRemote, 2000)
     return () => clearInterval(t)
   }, [])
 
@@ -202,6 +202,8 @@ export default function Home() {
                       name: "Demo User",
                       email: "demo@example.com",
                     }}
+                    productName="Demo"
+                    eventReportUrl="/api/events"
                     displayMode="inline"
                     showSources={true}
                     maxMessages={50}
@@ -293,6 +295,8 @@ export default function Home() {
           <ChatAssistant
             apiUrl="/api/chat"
             productId={selectedProjectId}
+            productName="Demo"
+            eventReportUrl="/api/events"
             user={{
               id: "demo-user-123",
               name: "Demo User",
