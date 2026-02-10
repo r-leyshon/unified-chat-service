@@ -9,6 +9,7 @@ import FloatingButton from "./floating-button"
 export default function ChatAssistant({
   apiUrl,
   productId,
+  productName,
   user,
   theme,
   displayMode = "floating",
@@ -18,6 +19,7 @@ export default function ChatAssistant({
   title,
   subtitle,
   onEvent,
+  eventReportUrl,
 }: ChatAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -31,6 +33,7 @@ export default function ChatAssistant({
         onClose={() => {}}
         apiUrl={apiUrl}
         productId={productId}
+        productName={productName}
         userId={userId}
         userName={userName}
         theme={theme}
@@ -40,6 +43,7 @@ export default function ChatAssistant({
         title={title}
         subtitle={subtitle}
         onEvent={onEvent}
+        eventReportUrl={eventReportUrl}
       />
     )
   }
@@ -63,6 +67,7 @@ export default function ChatAssistant({
         }}
         apiUrl={apiUrl}
         productId={productId}
+        productName={productName}
         userId={userId}
         userName={userName}
         theme={theme}
@@ -72,6 +77,7 @@ export default function ChatAssistant({
         title={title}
         subtitle={subtitle}
         onEvent={onEvent}
+        eventReportUrl={eventReportUrl}
       />
     </>
   )

@@ -1,20 +1,73 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { ChatAssistant } from "unified-chat"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 
+const EVENT_LOG_KEY = "unified-chat-demo-events"
+const MAX_PERSISTED = 100
+
 type Project = { id: string; name: string; slug: string; description?: string | null }
+type LogEvent = { type: string; time: string; payload?: unknown; source?: "demo" | "remote"; productName?: string }
+
+function loadPersistedEvents(): LogEvent[] {
+  if (typeof window === "undefined") return []
+  try {
+    const raw = localStorage.getItem(EVENT_LOG_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_PERSISTED) : []
+  } catch {
+    return []
+  }
+}
+
+function savePersistedEvents(events: LogEvent[]) {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(EVENT_LOG_KEY, JSON.stringify(events.slice(0, MAX_PERSISTED)))
+  } catch {
+    // ignore
+  }
+}
 
 export default function Home() {
   const [displayMode, setDisplayMode] = useState<"floating" | "inline">("floating")
-  const [events, setEvents] = useState<Array<{ type: string; time: string; payload?: unknown }>>([])
+  const [events, setEvents] = useState<LogEvent[]>([])
+  const [remoteEvents, setRemoteEvents] = useState<LogEvent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [projectsLoading, setProjectsLoading] = useState(true)
+
+  useEffect(() => {
+    setEvents(loadPersistedEvents())
+  }, [])
+  useEffect(() => {
+    const fetchRemote = () => {
+      fetch("/api/events")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setRemoteEvents(
+              data.map((e: { type: string; time: string; payload?: unknown; productId?: string; productName?: string }) => ({
+                type: e.type,
+                time: e.time,
+                payload: e.payload,
+                productName: e.productName,
+                source: "remote" as const,
+              })),
+            )
+          }
+        })
+        .catch(() => {})
+    }
+    fetchRemote()
+    const t = setInterval(fetchRemote, 8000)
+    return () => clearInterval(t)
+  }, [])
 
   useEffect(() => {
     fetch("/api/projects")
@@ -26,10 +79,19 @@ export default function Home() {
       .finally(() => setProjectsLoading(false))
   }, [])
 
-  const handleEvent = (event: { type: string; payload?: unknown }) => {
-    const now = new Date().toLocaleTimeString()
-    setEvents((prev) => [{ type: event.type, time: now, payload: event.payload }, ...prev.slice(0, 19)])
-  }
+  const handleEvent = useCallback(
+    (event: { type: string; payload?: unknown }) => {
+      if (event.type === "open" || event.type === "close") return
+      const now = new Date().toLocaleTimeString()
+      const logEvent: LogEvent = { type: event.type, time: now, payload: event.payload, source: "demo" }
+      setEvents((prev) => {
+        const next = [logEvent, ...prev.slice(0, MAX_PERSISTED - 1)]
+        savePersistedEvents(next)
+        return next
+      })
+    },
+    [],
+  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
@@ -144,11 +206,11 @@ export default function Home() {
             <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-border/50 sticky top-24">
               <h3 className="text-lg font-semibold text-foreground mb-4">Event Log</h3>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {events.length === 0 ? (
+                {[...remoteEvents, ...events].length === 0 ? (
                   <p className="text-xs text-muted-foreground">No events yet. Try sending a message!</p>
                 ) : (
-                  events.map((event, idx) => (
-                    <div key={idx} className="text-xs p-2 rounded bg-secondary/50 border border-border/50">
+                  [...remoteEvents, ...events].map((event, idx) => (
+                    <div key={`${event.source ?? "demo"}-${event.time}-${event.type}-${idx}`} className="text-xs p-2 rounded bg-secondary/50 border border-border/50">
                       <span className="font-mono text-primary">
                         {event.type === "search" &&
                         event.payload &&
@@ -159,7 +221,12 @@ export default function Home() {
                           : event.type}
                       </span>
                       <br />
-                      <span className="text-muted-foreground">{event.time}</span>
+                      <span className="text-muted-foreground">
+                        {event.time}
+                        {event.source === "remote" && event.productName && (
+                          <> · {event.productName}</>
+                        )}
+                      </span>
                     </div>
                   ))
                 )}

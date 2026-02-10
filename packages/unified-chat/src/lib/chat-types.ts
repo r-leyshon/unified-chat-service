@@ -37,12 +37,16 @@ export interface ChatAssistantEvent {
 export interface ChatAssistantProps {
   apiUrl: string
   productId: string
+  /** Optional: product name for event log display when reporting to a central service */
+  productName?: string
   user?: ChatUser
   theme?: ChatTheme
   displayMode?: DisplayMode
   showSources?: boolean
   maxMessages?: number
   onEvent?: (event: ChatAssistantEvent) => void
+  /** Optional: POST events (except open/close) to this URL so a central event log can show activity from consuming apps */
+  eventReportUrl?: string
   placeholder?: string
   title?: string
   subtitle?: string

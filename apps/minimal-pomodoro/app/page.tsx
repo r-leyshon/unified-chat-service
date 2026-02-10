@@ -119,6 +119,8 @@ export default function PomodoroPage() {
         <ChatAssistant
           apiUrl={`${chatServiceUrl}/api/chat`}
           productId={productId}
+          productName="Minimal Pomodoro"
+          eventReportUrl={`${chatServiceUrl}/api/events`}
           user={{ id: "pomodoro-user", name: "Pomodoro User" }}
           displayMode="floating"
           placeholder="Ask about the Pomodoro technique..."

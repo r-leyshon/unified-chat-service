@@ -16,6 +16,7 @@ interface ChatWindowProps {
   onClose: () => void
   apiUrl: string
   productId: string
+  productName?: string
   userId: string
   userName?: string
   theme?: ChatTheme
@@ -25,6 +26,7 @@ interface ChatWindowProps {
   title?: string
   subtitle?: string
   onEvent?: (event: ChatAssistantEvent) => void
+  eventReportUrl?: string
 }
 
 export default function ChatWindow({
@@ -32,6 +34,7 @@ export default function ChatWindow({
   onClose,
   apiUrl,
   productId,
+  productName,
   userId,
   userName,
   theme,
@@ -41,12 +44,30 @@ export default function ChatWindow({
   title = "Chat Assistant",
   subtitle = "Powered by AI",
   onEvent,
+  eventReportUrl,
 }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const reportEvent = (event: ChatAssistantEvent) => {
+    onEvent?.(event)
+    if (eventReportUrl && event.type !== "open" && event.type !== "close") {
+      fetch(eventReportUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId,
+          productName,
+          type: event.type,
+          payload: event.payload,
+          time: new Date().toISOString(),
+        }),
+      }).catch(() => {})
+    }
+  }
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -64,7 +85,7 @@ export default function ChatWindow({
     const newUserMessage: ChatMessage = { role: "user", content: userMessage }
     setMessages((prev) => [...prev.slice(-maxMessages + 1), newUserMessage])
 
-    onEvent?.({ type: "message_sent", payload: { content: userMessage } })
+    reportEvent({ type: "message_sent", payload: { content: userMessage } })
 
     setIsLoading(true)
     setStatusMessage(null)
@@ -114,7 +135,7 @@ export default function ChatWindow({
               if (data.type === "status") {
                 setStatusMessage(data.message ?? "Looking up guidance…")
               } else if (data.type === "search" && Array.isArray(data.searchTerms)) {
-                onEvent?.({ type: "search", payload: { searchTerms: data.searchTerms } })
+                reportEvent({ type: "search", payload: { searchTerms: data.searchTerms } })
               } else if (data.type === "content") {
                 setStatusMessage(null)
                 fullAnswer += data.content
@@ -129,7 +150,7 @@ export default function ChatWindow({
                 sources = data.sources
               } else if (data.type === "done") {
                 setStatusMessage(null)
-                onEvent?.({
+                reportEvent({
                   type: "message_received",
                   payload: { answer: fullAnswer, sources },
                 })
@@ -142,7 +163,7 @@ export default function ChatWindow({
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to get response"
-      onEvent?.({ type: "error", payload: { error: errorMessage } })
+      reportEvent({ type: "error", payload: { error: errorMessage } })
 
       setMessages((prev) => prev.slice(0, -1))
 
