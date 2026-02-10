@@ -64,7 +64,7 @@ export default function PomodoroPage() {
   const productId = process.env.NEXT_PUBLIC_POMODORO_PRODUCT_ID || ""
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-secondary/20">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-b from-background to-secondary/30">
       <h1 className="text-2xl font-semibold text-foreground mb-2">Minimal Pomodoro</h1>
       <p className="text-sm text-muted-foreground mb-8">
         Work 25 min → short break 5 min. After 4 work blocks, take a long break (15 min).
@@ -126,7 +126,6 @@ export default function PomodoroPage() {
           placeholder="Ask about the Pomodoro technique..."
           title="Pomodoro Help"
           subtitle="Powered by AI"
-          theme={{ primaryColor: "#3b82f6", accentColor: "#10b981" }}
         />
       )}
     </div>
