@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Scan unified-chat package so its Tailwind classes are generated (path relative to this file: app -> service -> apps -> packages) */
+@source "../../../packages/unified-chat";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

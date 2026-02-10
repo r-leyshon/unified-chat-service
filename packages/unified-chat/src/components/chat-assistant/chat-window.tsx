@@ -169,8 +169,17 @@ export default function ChatWindow({
 
   return (
     <div
-      className="fixed bottom-0 right-0 w-full sm:w-96 h-screen sm:h-[600px] sm:rounded-t-lg bg-background border-l border-t border-border shadow-2xl z-50 flex flex-col origin-bottom-right transition-[transform,opacity] duration-200 ease-out scale-100 opacity-100"
-      style={themeStyles}
+      className="fixed bottom-0 right-0 w-full sm:w-[380px] sm:rounded-tl-lg bg-background border-l border-t border-border shadow-2xl z-[9999] flex flex-col transition-[transform,opacity] duration-200 ease-out"
+      style={{
+        ...themeStyles,
+        // Anchor bottom-right; fixed height so inner scroll works and pane stays in viewport
+        position: "fixed",
+        bottom: 0,
+        right: 0,
+        zIndex: 9999,
+        height: "min(600px, 85vh)",
+        maxHeight: "85vh",
+      }}
     >
       <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary/5 to-accent/5">
         <div className="flex flex-col">

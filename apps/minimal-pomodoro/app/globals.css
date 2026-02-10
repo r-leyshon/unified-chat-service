@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Scan unified-chat package so its Tailwind classes are generated (path relative to this file) */
+@source "../../../packages/unified-chat";
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

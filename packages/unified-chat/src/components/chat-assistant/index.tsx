@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { createPortal } from "react-dom"
 import type { ChatAssistantProps } from "../../lib/chat-types"
 import ChatWindow from "./chat-window"
 import FloatingButton from "./floating-button"
@@ -43,7 +44,7 @@ export default function ChatAssistant({
     )
   }
 
-  return (
+  const floatingUI = (
     <>
       <FloatingButton
         onClick={() => {
@@ -74,4 +75,10 @@ export default function ChatAssistant({
       />
     </>
   )
+
+  // Portal to document.body so fixed positioning is viewport-relative (no ancestor transform/containing block)
+  if (typeof document !== "undefined") {
+    return createPortal(floatingUI, document.body)
+  }
+  return floatingUI
 }
