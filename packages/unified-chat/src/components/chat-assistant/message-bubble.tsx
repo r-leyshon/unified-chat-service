@@ -1,7 +1,7 @@
 "use client"
 
-import type { ChatMessage } from "@/lib/chat-types"
-import { cn } from "@/lib/utils"
+import type { ChatMessage } from "../../lib/chat-types"
+import { cn } from "../../lib/utils"
 import ReactMarkdown from "react-markdown"
 
 interface MessageBubbleProps {

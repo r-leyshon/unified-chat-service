@@ -11,17 +11,24 @@ export interface VertexConfig {
   location: string
 }
 
+const DEFAULT_KEY_FILE = "rich-experiments-6e037a3981c5.json"
+
 /**
  * Resolve GCP credentials in an environment-aware way:
  * - Vercel/production: use GCP_CREDENTIALS_JSON (full JSON string in env)
- * - Local: use GOOGLE_APPLICATION_CREDENTIALS path, or default key file in project root
+ * - Local: use GOOGLE_APPLICATION_CREDENTIALS path, or default key file in service root or monorepo root
  */
 function getCredentialsPath(): string | null {
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
     return process.env.GOOGLE_APPLICATION_CREDENTIALS
   }
-  const defaultPath = path.join(process.cwd(), "rich-experiments-6e037a3981c5.json")
-  return defaultPath
+  const cwd = process.cwd()
+  const inService = path.join(cwd, DEFAULT_KEY_FILE)
+  if (fs.existsSync(inService)) return inService
+  // When run from apps/unified-chat-service, monorepo root is two levels up
+  const inMonorepoRoot = path.join(cwd, "..", "..", DEFAULT_KEY_FILE)
+  if (fs.existsSync(inMonorepoRoot)) return inMonorepoRoot
+  return path.join(cwd, DEFAULT_KEY_FILE)
 }
 
 function getProjectIdFromCredentials(credentials: Record<string, unknown>): string {

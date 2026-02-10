@@ -7,6 +7,25 @@ import {
   buildChatAssistantSystemInstruction,
 } from "@/lib/prompts"
 
+/** CORS: allowed origins from env (comma-separated). Empty = same-origin only. */
+function getCorsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin")
+  const allowed = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()).filter(Boolean) ?? []
+  if (!origin) return {}
+  if (allowed.length === 0) return {}
+  if (!allowed.includes(origin)) return {}
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  }
+}
+
+export async function OPTIONS(req: Request) {
+  const cors = getCorsHeaders(req)
+  return new Response(null, { status: 204, headers: cors })
+}
+
 function parseSearchTerms(raw: string): string[] {
   const trimmed = raw?.trim() || ""
   if (!trimmed) return []
@@ -119,11 +138,13 @@ export async function POST(req: Request) {
     },
   })
 
+  const cors = getCorsHeaders(req)
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
+      ...cors,
     },
   })
 }

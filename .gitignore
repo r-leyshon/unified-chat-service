@@ -1,8 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 rich-experiments-6e037a3981c5.json
-# dependencies
-/node_modules
+# dependencies (root and in workspaces)
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -14,8 +14,8 @@ rich-experiments-6e037a3981c5.json
 # testing
 /coverage
 
-# next.js
-/.next/
+# next.js (root and in apps/*)
+.next/
 /out/
 
 # production

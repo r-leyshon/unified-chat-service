@@ -34,7 +34,8 @@ export async function extractTextFromFile(
   }
 
   if (lower.endsWith(".pdf")) {
-    const pdfParse = (await import("pdf-parse")).default
+    const mod = (await import("pdf-parse")) as unknown as { default?: (b: Buffer) => Promise<{ text: string }> } | ((b: Buffer) => Promise<{ text: string }>)
+    const pdfParse = typeof mod === "function" ? mod : mod.default!
     const data = await pdfParse(buffer)
     return { text: data.text, name }
   }

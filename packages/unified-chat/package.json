@@ -1,0 +1,24 @@
+{
+  "name": "unified-chat",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.tsx",
+  "types": "./src/index.tsx",
+  "exports": {
+    ".": "./src/index.tsx"
+  },
+  "scripts": {},
+  "peerDependencies": {
+    "react": "^18 || ^19",
+    "react-dom": "^18 || ^19"
+  },
+  "dependencies": {
+    "@radix-ui/react-scroll-area": "1.2.2",
+    "@radix-ui/react-slot": "1.1.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.454.0",
+    "react-markdown": "^10.1.0",
+    "tailwind-merge": "^3.3.1"
+  }
+}

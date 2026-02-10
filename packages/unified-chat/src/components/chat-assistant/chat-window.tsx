@@ -1,13 +1,13 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Spinner } from "@/components/ui/spinner"
-import type { ChatMessage, ChatResponse, ChatTheme } from "@/lib/chat-types"
+import { Button } from "../ui/button"
+import { Input } from "../ui/input"
+import { ScrollArea } from "../ui/scroll-area"
+import { Spinner } from "../ui/spinner"
+import type { ChatMessage, ChatResponse, ChatTheme } from "../../lib/chat-types"
+import type { ChatAssistantEvent } from "../../lib/chat-types"
 import MessageBubble from "./message-bubble"
 import { Send, X } from "lucide-react"
 
@@ -24,7 +24,7 @@ interface ChatWindowProps {
   placeholder?: string
   title?: string
   subtitle?: string
-  onEvent?: (event: import("@/lib/chat-types").ChatAssistantEvent) => void
+  onEvent?: (event: ChatAssistantEvent) => void
 }
 
 export default function ChatWindow({
@@ -48,7 +48,6 @@ export default function ChatWindow({
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to latest message
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" })
@@ -62,7 +61,6 @@ export default function ChatWindow({
     const userMessage = input.trim()
     setInput("")
 
-    // Add user message to UI immediately
     const newUserMessage: ChatMessage = { role: "user", content: userMessage }
     setMessages((prev) => [...prev.slice(-maxMessages + 1), newUserMessage])
 
@@ -72,11 +70,9 @@ export default function ChatWindow({
     setStatusMessage(null)
 
     try {
-      // Create assistant placeholder message
       const assistantMessage: ChatMessage = { role: "assistant", content: "" }
       setMessages((prev) => [...prev, assistantMessage])
 
-      // Stream response from backend
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
@@ -122,7 +118,6 @@ export default function ChatWindow({
               } else if (data.type === "content") {
                 setStatusMessage(null)
                 fullAnswer += data.content
-                // Update message with streamed content
                 setMessages((prev) => {
                   const updated = [...prev]
                   if (updated[updated.length - 1].role === "assistant") {
@@ -139,8 +134,8 @@ export default function ChatWindow({
                   payload: { answer: fullAnswer, sources },
                 })
               }
-            } catch (e) {
-              // Ignore JSON parse errors on non-data lines
+            } catch {
+              // ignore JSON parse errors
             }
           }
         }
@@ -149,10 +144,8 @@ export default function ChatWindow({
       const errorMessage = error instanceof Error ? error.message : "Failed to get response"
       onEvent?.({ type: "error", payload: { error: errorMessage } })
 
-      // Remove incomplete assistant message
       setMessages((prev) => prev.slice(0, -1))
 
-      // Add error message
       setMessages((prev) => [
         ...prev,
         {
@@ -176,10 +169,9 @@ export default function ChatWindow({
 
   return (
     <div
-      className="fixed bottom-0 right-0 w-full sm:w-96 h-screen sm:h-[600px] sm:rounded-t-lg bg-background border-l border-t border-border shadow-2xl z-50 flex flex-col"
+      className="fixed bottom-0 right-0 w-full sm:w-96 h-screen sm:h-[600px] sm:rounded-t-lg bg-background border-l border-t border-border shadow-2xl z-50 flex flex-col origin-bottom-right transition-[transform,opacity] duration-200 ease-out scale-100 opacity-100"
       style={themeStyles}
     >
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border bg-gradient-to-r from-primary/5 to-accent/5">
         <div className="flex flex-col">
           <h2 className="text-lg font-semibold text-foreground">{title}</h2>
@@ -194,7 +186,6 @@ export default function ChatWindow({
         </button>
       </div>
 
-      {/* Messages Area */}
       <ScrollArea className="flex-1 overflow-hidden">
         <div className="flex flex-col gap-4 p-4">
           {messages.length === 0 ? (
@@ -223,7 +214,6 @@ export default function ChatWindow({
         </div>
       </ScrollArea>
 
-      {/* Input Area */}
       <div className="p-4 border-t border-border bg-gradient-to-t from-background to-background">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <Input

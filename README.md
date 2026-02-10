@@ -1,85 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Unified Chat — Monorepo
 
-## Getting Started
+Monorepo for the **Unified Chat** service (API + document library + demo) and consumer apps that use the shared **unified-chat** widget.
 
-First, run the development server:
+## Structure
+
+- **`packages/unified-chat`** — Self-contained React chat component and types. Consumer apps depend on this package.
+- **`apps/unified-chat-service`** — Next.js app: chat API, document library (`/library`), and demo page. This is the “backend” and admin UI.
+- **`apps/minimal-pomodoro`** — Example consumer app: minimal Pomodoro timer + floating chat that calls the service.
+
+## Getting started
+
+From the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # runs the chat service on http://localhost:3000
+npm run dev:pomodoro # runs Minimal Pomodoro on http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+To run the service you need Postgres and (for RAG) GCP Vertex AI. See below.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Chat service (`apps/unified-chat-service`)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Local:** `npm run dev` from root (or `cd apps/unified-chat-service && npm run dev`). Opens [http://localhost:3000](http://localhost:3000): demo page + `/library` for projects and document uploads.
+- **Env:** Create `apps/unified-chat-service/.env.local` with `POSTGRES_URL` and (optional) GCP credentials. For **CORS** (when a consumer app on another origin calls the API), set **`ALLOWED_ORIGINS`** to a comma-separated list, e.g. `http://localhost:3001,https://minimal-pomodoro.vercel.app`.
 
-## Learn More
+### GCP Vertex AI (Gemini)
 
-To learn more about Next.js, take a look at the following resources:
+- **Local:** Put a GCP service account key JSON at the service app root or set `GOOGLE_APPLICATION_CREDENTIALS`. Do not commit the key (add to `.gitignore`).
+- **Vercel:** Set **`GCP_CREDENTIALS_JSON`** to the full contents of the service account JSON. Optionally **`GCP_PROJECT_ID`** and **`VERTEX_AI_LOCATION`** (default `us-central1`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Postgres + pgvector
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Local:** From repo root run `make up` (Docker). Then set `POSTGRES_URL` in `apps/unified-chat-service/.env.local` (e.g. `make db-url` and copy the line). With the service running, run `make init-db` once (or `curl -X POST http://localhost:3000/api/init-db`).
+- **Deployed:** Use Vercel Postgres or Neon; set **`POSTGRES_URL`** and call **`POST /api/init-db`** once after first deploy.
 
-## Chat assistant & Vertex AI (Gemini 2.5 Flash)
+## Minimal Pomodoro (`apps/minimal-pomodoro`)
 
-Completions use **GCP Vertex AI Gemini 2.5 Flash**. Credentials are loaded in an environment-aware way:
+Example consumer app: work/break timer and a floating chat that uses the unified-chat service.
 
-- **Local:** Place a GCP service account key JSON at the project root (e.g. `rich-experiments-6e037a3981c5.json`) or set `GOOGLE_APPLICATION_CREDENTIALS` to its path. Do not commit the key file (it is in `.gitignore`).
-- **Vercel:** Set the env var **`GCP_CREDENTIALS_JSON`** to the **full contents** of your service account JSON (paste the whole file as one string). Optionally set **`GCP_PROJECT_ID`** and **`VERTEX_AI_LOCATION`** (default `us-central1`).
+- **Env (optional):** In `apps/minimal-pomodoro/.env.local`:
+  - **`NEXT_PUBLIC_CHAT_SERVICE_URL`** — Base URL of the chat service (e.g. `http://localhost:3000` or `https://your-service.vercel.app`).
+  - **`NEXT_PUBLIC_POMODORO_PRODUCT_ID`** — Project UUID for “Minimal Pomodoro” from the document library. Create the project in `/library`, upload the Pomodoro docs, and copy the project ID.
 
-Enable the Vertex AI API for your GCP project and grant the service account appropriate Vertex AI permissions.
+If these are not set, the timer still works; the chat widget is simply not rendered.
 
-## Document Library (Postgres + pgvector)
+## Deploying to Vercel
 
-The **Document Library** (`/library`) lets you create projects (e.g. per product or app) and upload **.pdf** or **.txt** files. Documents are chunked, embedded with Vertex AI **text-embedding-005**, and stored in Postgres with **pgvector** for RAG.
+- **Chat service:** Create a Vercel project with **Root Directory** = `apps/unified-chat-service`. Set env vars (e.g. `POSTGRES_URL`, `GCP_CREDENTIALS_JSON`, `ALLOWED_ORIGINS`).
+- **Minimal Pomodoro:** Create another Vercel project with **Root Directory** = `apps/minimal-pomodoro`. Set `NEXT_PUBLIC_CHAT_SERVICE_URL` and `NEXT_PUBLIC_POMODORO_PRODUCT_ID`, and add the service URL to the service app’s `ALLOWED_ORIGINS`.
 
-### Local Postgres (development)
+## Using the chat widget in your app
 
-You can use a **local Postgres** instance before deploying. The repo includes container recipes:
+Add the workspace package and render the component:
 
-1. **Start Postgres + pgvector** (Docker):
-   ```bash
-   make up
-   # or: docker compose up -d
-   ```
-   This starts a Postgres container with the `pgvector` extension and a `unified_chat` database (user/password: `postgres`/`postgres`).
+```tsx
+import { ChatAssistant } from "unified-chat"
 
-2. **Set `POSTGRES_URL` in `.env.local`**:
-   ```bash
-   make db-url
-   ```
-   Copy the printed line into `.env.local`, or add:
-   ```bash
-   POSTGRES_URL="postgresql://postgres:postgres@localhost:5432/unified_chat?sslmode=disable"
-   ```
+<ChatAssistant
+  apiUrl={`${process.env.NEXT_PUBLIC_CHAT_SERVICE_URL}/api/chat`}
+  productId={process.env.NEXT_PUBLIC_PRODUCT_ID}
+  user={{ id: "user-id", name: "User Name" }}
+  displayMode="floating"
+  placeholder="Ask about this product..."
+  title="Help"
+  subtitle="Powered by AI"
+  theme={{ primaryColor: "#3b82f6", accentColor: "#10b981" }}
+/>
+```
 
-3. **Init schema:** With the app running (`npm run dev`), run once:
-   ```bash
-   make init-db
-   # or: curl -X POST http://localhost:3000/api/init-db
-   ```
-   This enables the `vector` extension and creates the `projects`, `documents`, and `document_chunks` tables.
+Your app must use Tailwind and the same CSS variable names (e.g. `--primary`, `--background`) or the widget will pick up your theme. See `apps/minimal-pomodoro` for a minimal setup.
 
-4. Open **[/library](http://localhost:3000/library)**: create a project, select it, and upload files.
+## Other commands
 
-**Other commands:** `make down` — stop containers; `make logs` — follow Postgres logs. See the **Makefile** for all targets.
-
-### Deployed (Vercel / Neon)
-
-- **Vercel Postgres:** Create a database in the Vercel dashboard and add **`POSTGRES_URL`** to your project env. Then call **`POST /api/init-db`** once (e.g. after first deploy).
-- **Neon:** Create a project at [Neon](https://neon.tech), add **`POSTGRES_URL`** (connection string), and run **`POST /api/init-db`** once. Same code works; `@vercel/postgres` is deprecated but the client works with any Postgres URL, including Neon.
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Root:** `npm run build` — builds all workspaces that define a build script.
+- **Service:** From `apps/unified-chat-service`, `make up` / `make down` / `make init-db` / `make logs` for local Postgres (see **Makefile**).

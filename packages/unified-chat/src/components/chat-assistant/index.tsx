@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { ChatAssistantProps } from "@/lib/chat-types"
+import type { ChatAssistantProps } from "../../lib/chat-types"
 import ChatWindow from "./chat-window"
 import FloatingButton from "./floating-button"
 
