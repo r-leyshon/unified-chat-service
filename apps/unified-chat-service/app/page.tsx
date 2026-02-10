@@ -6,6 +6,7 @@ import { ChatAssistant } from "unified-chat"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 const EVENT_LOG_KEY = "unified-chat-demo-events"
 const MAX_PERSISTED = 100
@@ -34,10 +35,33 @@ function savePersistedEvents(events: LogEvent[]) {
   }
 }
 
+function formatEventPayload(event: LogEvent): string {
+  if (!event.payload || typeof event.payload !== "object") return ""
+  const p = event.payload as Record<string, unknown>
+  if (event.type === "message_sent" && "content" in p)
+    return String(p.content)
+  if (event.type === "message_received") {
+    const parts: string[] = []
+    if ("answer" in p && p.answer) parts.push(String(p.answer))
+    if ("sources" in p && Array.isArray(p.sources) && p.sources.length > 0) {
+      parts.push("\nSources:")
+      ;(p.sources as Array<{ title?: string; url?: string }>).forEach((s, i) => {
+        parts.push(`  ${i + 1}. ${s.title ?? "—"} ${s.url ?? ""}`)
+      })
+    }
+    return parts.join("\n")
+  }
+  if (event.type === "search" && "searchTerms" in p && Array.isArray(p.searchTerms))
+    return (p.searchTerms as string[]).join(", ")
+  if (event.type === "error" && "error" in p) return String(p.error)
+  return JSON.stringify(p, null, 2)
+}
+
 export default function Home() {
   const [displayMode, setDisplayMode] = useState<"floating" | "inline">("floating")
   const [events, setEvents] = useState<LogEvent[]>([])
   const [remoteEvents, setRemoteEvents] = useState<LogEvent[]>([])
+  const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [projectsLoading, setProjectsLoading] = useState(true)
@@ -204,31 +228,60 @@ export default function Home() {
           {/* Event Log */}
           <div className="lg:col-span-1">
             <Card className="p-6 bg-gradient-to-br from-card to-card/50 border-border/50 sticky top-24">
-              <h3 className="text-lg font-semibold text-foreground mb-4">Event Log</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-1">Event Log</h3>
+              <p className="text-xs text-muted-foreground mb-4">Click to expand detail</p>
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {[...remoteEvents, ...events].length === 0 ? (
                   <p className="text-xs text-muted-foreground">No events yet. Try sending a message!</p>
                 ) : (
-                  [...remoteEvents, ...events].map((event, idx) => (
-                    <div key={`${event.source ?? "demo"}-${event.time}-${event.type}-${idx}`} className="text-xs p-2 rounded bg-secondary/50 border border-border/50">
-                      <span className="font-mono text-primary">
-                        {event.type === "search" &&
-                        event.payload &&
-                        typeof event.payload === "object" &&
-                        "searchTerms" in event.payload &&
-                        Array.isArray(event.payload.searchTerms)
-                          ? `search: ${(event.payload.searchTerms as string[]).join(", ")}`
-                          : event.type}
-                      </span>
-                      <br />
-                      <span className="text-muted-foreground">
-                        {event.time}
-                        {event.source === "remote" && event.productName && (
-                          <> · {event.productName}</>
+                  [...remoteEvents, ...events].map((event, idx) => {
+                    const eventKey = `${event.source ?? "demo"}-${event.time}-${event.type}-${idx}`
+                    const fullPayload = formatEventPayload(event)
+                    const hasPayload = fullPayload.length > 0
+                    const isExpanded = expandedEventKey === eventKey
+                    return (
+                      <div key={eventKey} className="rounded border border-border/50 bg-secondary/50 overflow-hidden">
+                        <button
+                          type="button"
+                          className="w-full text-left text-xs p-2 hover:bg-secondary/80 transition-colors cursor-pointer"
+                          onClick={() => setExpandedEventKey((k) => (k === eventKey ? null : eventKey))}
+                        >
+                          <span className="font-mono text-primary">
+                            {event.type === "search" &&
+                            event.payload &&
+                            typeof event.payload === "object" &&
+                            "searchTerms" in event.payload &&
+                            Array.isArray(event.payload.searchTerms)
+                              ? `search: ${(event.payload.searchTerms as string[]).join(", ")}`
+                              : event.type}
+                          </span>
+                          <br />
+                          <span className="text-muted-foreground">
+                            {event.time}
+                            {event.source === "remote" && event.productName && (
+                              <> · {event.productName}</>
+                            )}
+                            {hasPayload && (
+                              <span className="ml-1 inline-flex items-center gap-0.5">
+                                {isExpanded ? (
+                                  <ChevronUp className="w-3 h-3 inline" />
+                                ) : (
+                                  <ChevronDown className="w-3 h-3 inline" />
+                                )}
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                        {hasPayload && isExpanded && (
+                          <div className="border-t border-border/50 p-2 bg-background/50 max-h-48 overflow-auto">
+                            <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground">
+                              {fullPayload}
+                            </pre>
+                          </div>
                         )}
-                      </span>
-                    </div>
-                  ))
+                      </div>
+                    )
+                  })
                 )}
               </div>
             </Card>
