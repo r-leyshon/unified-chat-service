@@ -4,6 +4,7 @@ import {
   deleteChunksByDocumentId,
   insertChunk,
 } from "@/lib/db"
+import { requireLibraryAuth } from "@/lib/auth"
 import { chunkText } from "@/lib/documents"
 import { embedTexts } from "@/lib/embeddings"
 import { NextResponse } from "next/server"
@@ -32,6 +33,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ documentId: string }> },
 ) {
+  const { error } = await requireLibraryAuth()
+  if (error) return error
   const { documentId } = await params
   if (!documentId) {
     return NextResponse.json({ error: "documentId is required" }, { status: 400 })

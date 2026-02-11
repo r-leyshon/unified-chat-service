@@ -3,11 +3,14 @@ import {
   insertDocument,
   insertChunk,
 } from "@/lib/db"
+import { requireLibraryAuth } from "@/lib/auth"
 import { chunkText, extractTextFromFile } from "@/lib/documents"
 import { embedTexts } from "@/lib/embeddings"
 import { NextResponse } from "next/server"
 
 export async function POST(req: Request) {
+  const { error } = await requireLibraryAuth()
+  if (error) return error
   try {
     const formData = await req.formData()
     const projectId = formData.get("projectId")

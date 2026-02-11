@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { signOut } from "next-auth/react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,6 +19,7 @@ import {
   Copy,
   Check,
   Sparkles,
+  LogOut,
 } from "lucide-react"
 import {
   HoverCard,
@@ -341,6 +343,14 @@ export default function LibraryPage() {
             <h1 className="text-xl font-bold text-foreground">Document Library</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => signOut({ callbackUrl: "/" })}
+            >
+              <LogOut className="w-4 h-4" /> Sign out
+            </Button>
             {showAddForm ? (
               <form onSubmit={handleCreateProject} className="flex gap-2">
                 <Input

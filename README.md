@@ -28,6 +28,7 @@ To run the service you need Postgres and (for RAG) GCP Vertex AI. See below.
 
 - **Local:** `npm run dev` from root (or `cd apps/unified-chat-service && npm run dev`). Opens [http://localhost:3000](http://localhost:3000): demo page + `/library` for projects and document uploads.
 - **Env:** Create `apps/unified-chat-service/.env.local` with `POSTGRES_URL` and (optional) GCP credentials. For **CORS** (when a consumer app on another origin calls the API), set **`ALLOWED_ORIGINS`** to a comma-separated list, e.g. `http://localhost:3001,http://localhost:3002,http://localhost:3003,https://minimal-pomodoro.vercel.app`.
+- **Document library auth:** The `/library` page requires GitHub OAuth. See [apps/unified-chat-service/docs/LIBRARY_AUTH_SETUP.md](apps/unified-chat-service/docs/LIBRARY_AUTH_SETUP.md) for creating a GitHub OAuth App and configuring `AUTH_SECRET`, `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET`, and `LIBRARY_ALLOWED_GITHUB_USERNAMES`.
 
 ### GCP Vertex AI (Gemini)
 

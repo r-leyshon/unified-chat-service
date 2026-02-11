@@ -1,4 +1,5 @@
 import { listProjects, createProject } from "@/lib/db"
+import { requireLibraryAuth } from "@/lib/auth"
 import { NextResponse } from "next/server"
 
 export async function GET() {
@@ -18,6 +19,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const { error } = await requireLibraryAuth()
+  if (error) return error
   try {
     const body = await req.json()
     const name = typeof body.name === "string" ? body.name.trim() : ""

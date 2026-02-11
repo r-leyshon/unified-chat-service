@@ -1,10 +1,13 @@
 import { deleteProject, updateProjectDescription } from "@/lib/db"
+import { requireLibraryAuth } from "@/lib/auth"
 import { NextResponse } from "next/server"
 
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { error } = await requireLibraryAuth()
+  if (error) return error
   const { projectId } = await params
   if (!projectId) {
     return NextResponse.json({ error: "projectId is required" }, { status: 400 })
@@ -25,6 +28,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
+  const { error } = await requireLibraryAuth()
+  if (error) return error
   const { projectId } = await params
   if (!projectId) {
     return NextResponse.json({ error: "projectId is required" }, { status: 400 })
