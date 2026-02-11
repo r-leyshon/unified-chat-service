@@ -11,5 +11,8 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "devDependencies": {
+    "baseline-browser-mapping": "^2.9.19"
+  }
 }
