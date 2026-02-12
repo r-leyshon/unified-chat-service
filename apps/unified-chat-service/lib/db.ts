@@ -1,14 +1,36 @@
-import { Pool } from "pg"
+import { Pool as NeonPool, neonConfig } from "@neondatabase/serverless"
+import { Pool as PgPool } from "pg"
 
-let pool: Pool | null = null
+type QueryResult = { rows: unknown[]; rowCount: number | null }
 
-function getPool(): Pool {
-  if (!pool) {
-    const url = process.env.POSTGRES_URL
-    if (!url) throw new Error("POSTGRES_URL is not set")
-    pool = new Pool({ connectionString: url })
+function createDbClient() {
+  const url = process.env.POSTGRES_URL
+  if (!url) throw new Error("POSTGRES_URL is not set")
+
+  const isNeon =
+    url.includes("neon.tech") || url.includes("neon.db.ondigitalocean.com")
+
+  // Use Neon serverless Pool for Neon URLs — HTTP fetch, no url.parse/SSL warnings, faster in serverless.
+  // Fall back to pg Pool for local Docker Postgres.
+  if (isNeon) {
+    neonConfig.poolQueryViaFetch = true
   }
-  return pool
+
+  const PoolClass = isNeon ? NeonPool : PgPool
+  const pool = new PoolClass({ connectionString: url })
+  return {
+    query: async (text: string, values?: unknown[]): Promise<QueryResult> => {
+      const result = await pool.query(text, values)
+      return { rows: result.rows, rowCount: result.rowCount }
+    },
+  }
+}
+
+let db: ReturnType<typeof createDbClient> | null = null
+
+function getDb() {
+  if (!db) db = createDbClient()
+  return db
 }
 
 export type Project = {
@@ -29,7 +51,7 @@ export type Document = {
 
 /** Ensure pgvector extension and tables exist. Run once (e.g. POST /api/init-db). */
 export async function initVectorSchema() {
-  const db = getPool()
+  const db = getDb()
   await db.query("CREATE EXTENSION IF NOT EXISTS vector")
   await db.query(`
     CREATE TABLE IF NOT EXISTS projects (
@@ -58,7 +80,7 @@ export async function initVectorSchema() {
     await db.query("ALTER TABLE documents ADD COLUMN content TEXT")
   } catch (e: unknown) {
     const code = (e as { code?: string })?.code
-    if (code !== "42701") throw e // 42701 = duplicate_column (already exists)
+    if (code !== "42701") throw e
   }
   await db.query(`
     CREATE TABLE IF NOT EXISTS document_chunks (
@@ -73,7 +95,7 @@ export async function initVectorSchema() {
 }
 
 export async function listProjects(): Promise<Project[]> {
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     "SELECT id, name, slug, description, created_at FROM projects ORDER BY name",
   )
   return rows as Project[]
@@ -84,36 +106,36 @@ export async function createProject(name: string, description?: string | null): 
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "")
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     `INSERT INTO projects (name, slug, description) VALUES ($1, $2, $3)
      ON CONFLICT (slug) DO UPDATE SET name = $1, description = $3
      RETURNING id, name, slug, description, created_at`,
     [name, slug, description ?? null],
   )
-  return rows[0] as Project
+  return (rows as Project[])[0]
 }
 
 export async function getProjectBySlug(slug: string): Promise<Project | null> {
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     "SELECT id, name, slug, description, created_at FROM projects WHERE slug = $1 LIMIT 1",
     [slug],
   )
-  return (rows[0] as Project) ?? null
+  return ((rows as Project[])[0] as Project) ?? null
 }
 
 export async function getProjectById(id: string): Promise<Project | null> {
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     "SELECT id, name, slug, description, created_at FROM projects WHERE id = $1 LIMIT 1",
     [id],
   )
-  return (rows[0] as Project) ?? null
+  return ((rows as Project[])[0] as Project) ?? null
 }
 
 export async function updateProjectDescription(
   projectId: string,
   description: string | null,
 ): Promise<boolean> {
-  const { rowCount } = await getPool().query(
+  const { rowCount } = await getDb().query(
     "UPDATE projects SET description = $2 WHERE id = $1",
     [projectId, description],
   )
@@ -122,12 +144,12 @@ export async function updateProjectDescription(
 
 /** Delete a project and all its documents and chunks (cascade). Returns true if a row was deleted. */
 export async function deleteProject(projectId: string): Promise<boolean> {
-  const { rowCount } = await getPool().query("DELETE FROM projects WHERE id = $1", [projectId])
+  const { rowCount } = await getDb().query("DELETE FROM projects WHERE id = $1", [projectId])
   return (rowCount ?? 0) > 0
 }
 
 export async function listDocuments(projectId: string): Promise<Document[]> {
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     `SELECT id, project_id, name, file_name, created_at FROM documents
      WHERE project_id = $1 ORDER BY created_at DESC`,
     [projectId],
@@ -152,16 +174,16 @@ export async function getProjectDocumentationContent(projectId: string): Promise
 export async function getDocumentContent(
   documentId: string,
 ): Promise<{ name: string; file_name: string; content: string } | null> {
-  const docRows = await getPool().query(
+  const docRows = await getDb().query(
     "SELECT name, file_name, content FROM documents WHERE id = $1 LIMIT 1",
     [documentId],
   )
-  const doc = docRows.rows[0] as { name: string; file_name: string; content: string | null } | undefined
+  const doc = (docRows.rows[0] as { name: string; file_name: string; content: string | null } | undefined)
   if (!doc) return null
   if (doc.content != null && doc.content !== "") {
     return { name: doc.name, file_name: doc.file_name, content: doc.content }
   }
-  const chunkRows = await getPool().query(
+  const chunkRows = await getDb().query(
     "SELECT content FROM document_chunks WHERE document_id = $1 ORDER BY id",
     [documentId],
   )
@@ -171,7 +193,7 @@ export async function getDocumentContent(
 
 /** Update document raw content. */
 export async function updateDocumentContent(documentId: string, content: string): Promise<boolean> {
-  const { rowCount } = await getPool().query(
+  const { rowCount } = await getDb().query(
     "UPDATE documents SET content = $2 WHERE id = $1",
     [documentId, content],
   )
@@ -180,12 +202,12 @@ export async function updateDocumentContent(documentId: string, content: string)
 
 /** Delete all chunks for a document (used before re-indexing). */
 export async function deleteChunksByDocumentId(documentId: string): Promise<void> {
-  await getPool().query("DELETE FROM document_chunks WHERE document_id = $1", [documentId])
+  await getDb().query("DELETE FROM document_chunks WHERE document_id = $1", [documentId])
 }
 
 /** Delete a document and its chunks (cascade). Returns true if a row was deleted. */
 export async function deleteDocument(documentId: string): Promise<boolean> {
-  const { rowCount } = await getPool().query("DELETE FROM documents WHERE id = $1", [documentId])
+  const { rowCount } = await getDb().query("DELETE FROM documents WHERE id = $1", [documentId])
   return (rowCount ?? 0) > 0
 }
 
@@ -195,12 +217,12 @@ export async function insertDocument(
   fileName: string,
   content?: string | null,
 ): Promise<Document> {
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     `INSERT INTO documents (project_id, name, file_name, content) VALUES ($1, $2, $3, $4)
      RETURNING id, project_id, name, file_name, created_at`,
     [projectId, name, fileName, content ?? null],
   )
-  return rows[0] as Document
+  return (rows as Document[])[0]
 }
 
 export async function insertChunk(
@@ -209,7 +231,7 @@ export async function insertChunk(
   embedding: number[],
 ): Promise<void> {
   const vec = `[${embedding.join(",")}]`
-  await getPool().query(
+  await getDb().query(
     "INSERT INTO document_chunks (document_id, content, embedding) VALUES ($1, $2, $3::vector)",
     [documentId, content, vec],
   )
@@ -222,7 +244,7 @@ export async function searchChunks(
   limit: number = 5,
 ): Promise<{ content: string; document_name: string }[]> {
   const vec = `[${queryEmbedding.join(",")}]`
-  const { rows } = await getPool().query(
+  const { rows } = await getDb().query(
     `SELECT c.content, d.name AS document_name
      FROM document_chunks c
      JOIN documents d ON d.id = c.document_id
