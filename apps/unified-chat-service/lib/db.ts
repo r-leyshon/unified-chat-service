@@ -92,6 +92,19 @@ export async function initVectorSchema() {
   `)
   await db.query("CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id ON document_chunks(document_id)")
   await db.query("CREATE INDEX IF NOT EXISTS idx_documents_project_id ON documents(project_id)")
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS chat_events (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      product_id TEXT NOT NULL DEFAULT '',
+      product_name TEXT,
+      type TEXT NOT NULL,
+      payload JSONB,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `)
+  await db.query("CREATE INDEX IF NOT EXISTS idx_chat_events_product_id ON chat_events(product_id)")
+  await db.query("CREATE INDEX IF NOT EXISTS idx_chat_events_created_at ON chat_events(created_at DESC)")
 }
 
 export async function listProjects(): Promise<Project[]> {
@@ -234,6 +247,64 @@ export async function insertChunk(
   await getDb().query(
     "INSERT INTO document_chunks (document_id, content, embedding) VALUES ($1, $2, $3::vector)",
     [documentId, content, vec],
+  )
+}
+
+/** Insert a chat event and prune if over MAX_EVENTS. */
+const MAX_CHAT_EVENTS = 500
+export async function insertChatEvent(
+  productId: string,
+  productName: string | null,
+  type: string,
+  payload: unknown,
+): Promise<void> {
+  const db = getDb()
+  const payloadJson = payload != null ? JSON.stringify(payload) : null
+  await db.query(
+    `INSERT INTO chat_events (product_id, product_name, type, payload)
+     VALUES ($1, $2, $3, $4::jsonb)`,
+    [productId, productName, type, payloadJson],
+  )
+  const { rows } = await db.query("SELECT COUNT(*)::int AS cnt FROM chat_events")
+  const count = (rows[0] as { cnt: number })?.cnt ?? 0
+  if (count > MAX_CHAT_EVENTS) {
+    await db.query(
+      `DELETE FROM chat_events
+       WHERE id IN (
+         SELECT id FROM chat_events
+         ORDER BY created_at ASC
+         LIMIT $1
+       )`,
+      [count - MAX_CHAT_EVENTS],
+    )
+  }
+}
+
+/** List recent chat events, optionally filtered by productId. */
+export async function listChatEvents(productId?: string | null): Promise<
+  { productId: string; productName?: string; type: string; payload?: unknown; time: string }[]
+> {
+  const db = getDb()
+  const rows = productId
+    ? (await db.query(
+        `SELECT product_id, product_name, type, payload, created_at
+         FROM chat_events WHERE product_id = $1
+         ORDER BY created_at DESC LIMIT 100`,
+        [productId],
+      )).rows
+    : (await db.query(
+        `SELECT product_id, product_name, type, payload, created_at
+         FROM chat_events
+         ORDER BY created_at DESC LIMIT 100`,
+      )).rows
+  return (rows as Array<{ product_id: string; product_name: string | null; type: string; payload: unknown; created_at: string | Date }>).map(
+    (r) => ({
+      productId: r.product_id,
+      productName: r.product_name ?? undefined,
+      type: r.type,
+      payload: r.payload,
+      time: typeof r.created_at === "string" ? r.created_at : new Date(r.created_at).toISOString(),
+    }),
   )
 }
 

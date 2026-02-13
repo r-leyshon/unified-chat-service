@@ -20,7 +20,8 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const productId = req.nextUrl.searchParams.get("productId")
-  return Response.json(getEvents(productId), { headers: getCorsHeaders(req) })
+  const events = await getEvents(productId)
+  return Response.json(events, { headers: getCorsHeaders(req) })
 }
 
 export async function POST(req: NextRequest) {
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
         { status: 400, headers }
       )
     }
-    pushEvent({
+    await pushEvent({
       productId: typeof productId === "string" ? productId : "",
       productName: typeof productName === "string" ? productName : undefined,
       type,

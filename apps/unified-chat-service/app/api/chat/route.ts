@@ -68,12 +68,12 @@ export async function POST(req: Request) {
       const project = productId ? await getProjectById(productId) : null
       const productName = project?.name ?? undefined
 
-      const registerEvent = (type: string, payload?: unknown) => {
-        pushEvent({ productId: productId ?? "", productName, type, payload })
+      const registerEvent = async (type: string, payload?: unknown) => {
+        await pushEvent({ productId: productId ?? "", productName, type, payload })
       }
 
       if (lastUserText.trim()) {
-        registerEvent("message_sent", { content: lastUserText })
+        await registerEvent("message_sent", { content: lastUserText })
       }
 
       try {
@@ -90,14 +90,23 @@ export async function POST(req: Request) {
               })
               const extractionText =
                 extractionResult.response?.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-              const searchTerms = parseSearchTerms(extractionText)
+              let searchTerms = parseSearchTerms(extractionText)
+              if (searchTerms.length === 0) {
+                const lower = lastUserText.toLowerCase()
+                const isVagueProductQuestion =
+                  lower.length < 80 &&
+                  (lower.includes("app") || lower.includes("this") || lower.includes("what") || lower.includes("for") || lower.includes("about"))
+                if (isVagueProductQuestion) {
+                  searchTerms = [project.name, "getting started"]
+                }
+              }
               console.info(
                 "[chat] product_id=%s extracted_search_terms=%s",
                 productId,
                 JSON.stringify(searchTerms),
               )
               if (searchTerms.length >= 1) {
-                registerEvent("search", { searchTerms })
+                await registerEvent("search", { searchTerms })
                 enqueue(controller, { type: "search", searchTerms })
                 enqueue(controller, { type: "status", message: "Looking up guidance…" })
                 const query = searchTerms.join(" ")
@@ -127,18 +136,20 @@ export async function POST(req: Request) {
           contents,
           systemInstruction,
         })
+        let fullAnswer = ""
         for await (const item of streamingResult.stream) {
           const text = item.candidates?.[0]?.content?.parts?.[0]?.text
           if (text) {
+            fullAnswer += text
             enqueue(controller, { type: "content", content: text })
           }
         }
         enqueue(controller, { type: "sources", sources })
         enqueue(controller, { type: "done" })
-        registerEvent("message_received", { sources })
+        await registerEvent("message_received", { answer: fullAnswer, sources })
       } catch (err) {
         const message = err instanceof Error ? err.message : "Vertex AI error"
-        registerEvent("error", { error: message })
+        await registerEvent("error", { error: message })
         enqueue(controller, { type: "content", content: `Error: ${message}` })
         enqueue(controller, { type: "sources", sources: [] })
         enqueue(controller, { type: "done" })

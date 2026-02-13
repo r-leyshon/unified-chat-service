@@ -1,9 +1,9 @@
 /**
- * Shared in-memory event store. Used by /api/events and by the chat route to register
- * events server-side (no consumer POST needed).
+ * Event store backed by Postgres. Used by /api/events and by the chat route to register
+ * events. Persisted in DB so events are visible across serverless instances.
  */
 
-const MAX_EVENTS = 500
+import { insertChatEvent, listChatEvents } from "@/lib/db"
 
 export type StoredEvent = {
   productId: string
@@ -13,16 +13,15 @@ export type StoredEvent = {
   time: string
 }
 
-const store: StoredEvent[] = []
-
-export function pushEvent(event: Omit<StoredEvent, "time">): void {
-  const full: StoredEvent = { ...event, time: new Date().toISOString() }
-  store.push(full)
-  while (store.length > MAX_EVENTS) store.shift()
+export async function pushEvent(event: Omit<StoredEvent, "time">): Promise<void> {
+  await insertChatEvent(
+    event.productId ?? "",
+    event.productName ?? null,
+    event.type,
+    event.payload,
+  )
 }
 
-export function getEvents(productId?: string | null): StoredEvent[] {
-  let list = [...store].reverse()
-  if (productId) list = list.filter((e) => e.productId === productId)
-  return list.slice(0, 100)
+export async function getEvents(productId?: string | null): Promise<StoredEvent[]> {
+  return listChatEvents(productId)
 }

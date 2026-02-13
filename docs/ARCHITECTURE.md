@@ -30,7 +30,7 @@ flowchart LR
 
 - **Consumers** call `/api/chat` (chat + RAG). The service registers events automatically; consumers do not POST to `/api/events`.
 - **Library** (`/library`) uses GitHub OAuth; you manage projects and documents there.
-- **init-db** creates tables (projects, documents, document_chunks) in Neon.
+- **init-db** creates tables (projects, documents, document_chunks, chat_events) in Neon.
 
 ## Services Used
 
