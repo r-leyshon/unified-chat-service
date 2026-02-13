@@ -126,9 +126,7 @@ export default function Home() {
                   </select>
                 )}
                 {selectedProjectId && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    product_id = <code className="bg-secondary px-1 rounded">{selectedProjectId}</code>
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Project selected</p>
                 )}
               </div>
 
