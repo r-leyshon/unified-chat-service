@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { ChatAssistant } from "unified-chat"
 import { Card } from "@/components/ui/card"
@@ -8,32 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { ChevronDown, ChevronUp } from "lucide-react"
 
-const EVENT_LOG_KEY = "unified-chat-demo-events"
-const MAX_PERSISTED = 100
-
 type Project = { id: string; name: string; slug: string; description?: string | null }
-type LogEvent = { type: string; time: string; payload?: unknown; source?: "demo" | "remote"; productName?: string }
-
-function loadPersistedEvents(): LogEvent[] {
-  if (typeof window === "undefined") return []
-  try {
-    const raw = localStorage.getItem(EVENT_LOG_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_PERSISTED) : []
-  } catch {
-    return []
-  }
-}
-
-function savePersistedEvents(events: LogEvent[]) {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(EVENT_LOG_KEY, JSON.stringify(events.slice(0, MAX_PERSISTED)))
-  } catch {
-    // ignore
-  }
-}
+type LogEvent = { type: string; time: string; payload?: unknown; productName?: string }
 
 function formatEventPayload(event: LogEvent): string {
   if (!event.payload || typeof event.payload !== "object") return ""
@@ -60,36 +36,31 @@ function formatEventPayload(event: LogEvent): string {
 export default function Home() {
   const [displayMode, setDisplayMode] = useState<"floating" | "inline">("floating")
   const [events, setEvents] = useState<LogEvent[]>([])
-  const [remoteEvents, setRemoteEvents] = useState<LogEvent[]>([])
   const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [projectsLoading, setProjectsLoading] = useState(true)
 
   useEffect(() => {
-    setEvents(loadPersistedEvents())
-  }, [])
-  useEffect(() => {
-    const fetchRemote = () => {
+    const fetchEvents = () => {
       fetch("/api/events")
         .then((r) => r.json())
         .then((data) => {
           if (Array.isArray(data)) {
-            setRemoteEvents(
+            setEvents(
               data.map((e: { type: string; time: string; payload?: unknown; productId?: string; productName?: string }) => ({
                 type: e.type,
                 time: e.time,
                 payload: e.payload,
                 productName: e.productName,
-                source: "remote" as const,
               })),
             )
           }
         })
         .catch(() => {})
     }
-    fetchRemote()
-    const t = setInterval(fetchRemote, 2000)
+    fetchEvents()
+    const t = setInterval(fetchEvents, 2000)
     return () => clearInterval(t)
   }, [])
 
@@ -102,20 +73,6 @@ export default function Home() {
       .catch(() => {})
       .finally(() => setProjectsLoading(false))
   }, [])
-
-  const handleEvent = useCallback(
-    (event: { type: string; payload?: unknown }) => {
-      if (event.type === "open" || event.type === "close") return
-      const now = new Date().toLocaleTimeString()
-      const logEvent: LogEvent = { type: event.type, time: now, payload: event.payload, source: "demo" }
-      setEvents((prev) => {
-        const next = [logEvent, ...prev.slice(0, MAX_PERSISTED - 1)]
-        savePersistedEvents(next)
-        return next
-      })
-    },
-    [],
-  )
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/10">
@@ -203,7 +160,6 @@ export default function Home() {
                       email: "demo@example.com",
                     }}
                     productName="Demo"
-                    eventReportUrl="/api/events"
                     displayMode="inline"
                     showSources={true}
                     maxMessages={50}
@@ -214,7 +170,6 @@ export default function Home() {
                       primaryColor: "#3b82f6",
                       accentColor: "#10b981",
                     }}
-                    onEvent={handleEvent}
                   />
                 </div>
               )}
@@ -233,11 +188,11 @@ export default function Home() {
               <h3 className="text-lg font-semibold text-foreground mb-1">Event Log</h3>
               <p className="text-xs text-muted-foreground mb-4">Click to expand detail</p>
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {[...remoteEvents, ...events].length === 0 ? (
+                {events.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No events yet. Try sending a message!</p>
                 ) : (
-                  [...remoteEvents, ...events].map((event, idx) => {
-                    const eventKey = `${event.source ?? "demo"}-${event.time}-${event.type}-${idx}`
+                  events.map((event, idx) => {
+                    const eventKey = `${event.time}-${event.type}-${idx}`
                     const fullPayload = formatEventPayload(event)
                     const hasPayload = fullPayload.length > 0
                     const isExpanded = expandedEventKey === eventKey
@@ -260,9 +215,7 @@ export default function Home() {
                           <br />
                           <span className="text-muted-foreground">
                             {event.time}
-                            {event.source === "remote" && event.productName && (
-                              <> · {event.productName}</>
-                            )}
+                            {event.productName && <> · {event.productName}</>}
                             {hasPayload && (
                               <span className="ml-1 inline-flex items-center gap-0.5">
                                 {isExpanded ? (
@@ -296,7 +249,6 @@ export default function Home() {
             apiUrl="/api/chat"
             productId={selectedProjectId}
             productName="Demo"
-            eventReportUrl="/api/events"
             user={{
               id: "demo-user-123",
               name: "Demo User",
@@ -312,7 +264,6 @@ export default function Home() {
               primaryColor: "#3b82f6",
               accentColor: "#10b981",
             }}
-            onEvent={handleEvent}
           />
         )}
       </main>

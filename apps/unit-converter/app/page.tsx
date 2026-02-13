@@ -185,7 +185,6 @@ export default function UnitConverterPage() {
           apiUrl={`${chatServiceUrl}/api/chat`}
           productId={productId}
           productName="Unit Converter"
-          eventReportUrl={`${chatServiceUrl}/api/events`}
           user={{ id: "converter-user", name: "Converter User" }}
           displayMode="floating"
           placeholder="Ask about unit conversions..."

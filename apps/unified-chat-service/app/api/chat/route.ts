@@ -1,12 +1,12 @@
 import { getGeminiModel } from "@/lib/vertex-ai"
 import { getProjectById, searchChunks } from "@/lib/db"
 import { embedText } from "@/lib/embeddings"
+import { pushEvent } from "@/lib/events"
 import {
   EXTRACTION_SYSTEM,
   buildExtractionUserMessage,
   buildChatAssistantSystemInstruction,
 } from "@/lib/prompts"
-
 /** CORS: allowed origins from env (comma-separated). Empty = same-origin only. */
 function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin")
@@ -65,12 +65,20 @@ export async function POST(req: Request) {
     async start(controller) {
       let contextBlock = ""
       let sources: { title: string; url: string }[] = []
+      const project = productId ? await getProjectById(productId) : null
+      const productName = project?.name ?? undefined
+
+      const registerEvent = (type: string, payload?: unknown) => {
+        pushEvent({ productId: productId ?? "", productName, type, payload })
+      }
+
+      if (lastUserText.trim()) {
+        registerEvent("message_sent", { content: lastUserText })
+      }
 
       try {
-        if (productId && lastUserText.trim()) {
-          const project = await getProjectById(productId)
-          if (project) {
-            const extractionPrompt = buildExtractionUserMessage(
+        if (productId && lastUserText.trim() && project) {
+          const extractionPrompt = buildExtractionUserMessage(
               project.name,
               project.description,
               lastUserText,
@@ -89,6 +97,7 @@ export async function POST(req: Request) {
                 JSON.stringify(searchTerms),
               )
               if (searchTerms.length >= 1) {
+                registerEvent("search", { searchTerms })
                 enqueue(controller, { type: "search", searchTerms })
                 enqueue(controller, { type: "status", message: "Looking up guidance…" })
                 const query = searchTerms.join(" ")
@@ -110,7 +119,6 @@ export async function POST(req: Request) {
             } catch (err) {
               console.warn("[chat] extraction or search failed", err)
             }
-          }
         }
 
         const systemInstruction = buildChatAssistantSystemInstruction(contextBlock)
@@ -127,8 +135,10 @@ export async function POST(req: Request) {
         }
         enqueue(controller, { type: "sources", sources })
         enqueue(controller, { type: "done" })
+        registerEvent("message_received", { sources })
       } catch (err) {
         const message = err instanceof Error ? err.message : "Vertex AI error"
+        registerEvent("error", { error: message })
         enqueue(controller, { type: "content", content: `Error: ${message}` })
         enqueue(controller, { type: "sources", sources: [] })
         enqueue(controller, { type: "done" })

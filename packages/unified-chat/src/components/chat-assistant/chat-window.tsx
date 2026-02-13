@@ -26,7 +26,6 @@ interface ChatWindowProps {
   title?: string
   subtitle?: string
   onEvent?: (event: ChatAssistantEvent) => void
-  eventReportUrl?: string
 }
 
 export default function ChatWindow({
@@ -44,7 +43,6 @@ export default function ChatWindow({
   title = "Chat Assistant",
   subtitle = "Powered by AI",
   onEvent,
-  eventReportUrl,
 }: ChatWindowProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState("")
@@ -54,19 +52,6 @@ export default function ChatWindow({
 
   const reportEvent = (event: ChatAssistantEvent) => {
     onEvent?.(event)
-    if (eventReportUrl && event.type !== "open" && event.type !== "close") {
-      fetch(eventReportUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId,
-          productName,
-          type: event.type,
-          payload: event.payload,
-          time: new Date().toISOString(),
-        }),
-      }).catch(() => {})
-    }
   }
 
   useEffect(() => {

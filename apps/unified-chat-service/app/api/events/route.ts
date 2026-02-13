@@ -1,13 +1,5 @@
 import { NextRequest } from "next/server"
-
-const MAX_EVENTS = 500
-const store: Array<{
-  productId: string
-  productName?: string
-  type: string
-  payload?: unknown
-  time: string
-}> = []
+import { pushEvent, getEvents } from "@/lib/events"
 
 function getCorsHeaders(req: NextRequest) {
   const origin = req.headers.get("origin")
@@ -28,9 +20,7 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const productId = req.nextUrl.searchParams.get("productId")
-  let list = [...store].reverse()
-  if (productId) list = list.filter((e) => e.productId === productId)
-  return Response.json(list.slice(0, 100), { headers: getCorsHeaders(req) })
+  return Response.json(getEvents(productId), { headers: getCorsHeaders(req) })
 }
 
 export async function POST(req: NextRequest) {
@@ -45,15 +35,12 @@ export async function POST(req: NextRequest) {
         { status: 400, headers }
       )
     }
-    const time = new Date().toISOString()
-    store.push({
+    pushEvent({
       productId: typeof productId === "string" ? productId : "",
       productName: typeof productName === "string" ? productName : undefined,
       type,
       payload,
-      time,
     })
-    while (store.length > MAX_EVENTS) store.shift()
     return Response.json({ ok: true }, { status: 201, headers })
   } catch {
     return Response.json({ error: "Invalid body" }, { status: 400, headers })

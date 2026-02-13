@@ -19,7 +19,6 @@ export default function ChatAssistant({
   title,
   subtitle,
   onEvent,
-  eventReportUrl,
 }: ChatAssistantProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -43,7 +42,6 @@ export default function ChatAssistant({
         title={title}
         subtitle={subtitle}
         onEvent={onEvent}
-        eventReportUrl={eventReportUrl}
       />
     )
   }
@@ -77,7 +75,6 @@ export default function ChatAssistant({
         title={title}
         subtitle={subtitle}
         onEvent={onEvent}
-        eventReportUrl={eventReportUrl}
       />
     </>
   )

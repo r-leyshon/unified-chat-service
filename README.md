@@ -86,11 +86,11 @@ import { ChatAssistant } from "unified-chat"
 
 Your app must use Tailwind and the same CSS variable names (e.g. `--primary`, `--background`) or the widget will pick up your theme. See `apps/minimal-pomodoro` for a minimal setup.
 
-To have chat events show up in the service’s event log (demo page), pass **`eventReportUrl`** (e.g. `https://your-service/api/events`) and optionally **`productName`** so entries are labeled by product.
+Chat events are **registered automatically** by the service when handling POST /api/chat. The demo page event log shows them via GET /api/events.
 
 ### Multiple sources and concurrent requests
 
-- **Event log:** Events from the demo and from consumer apps (that set `eventReportUrl`) are sent to **POST /api/events** and shown in the demo event log. The log is persisted in the browser (localStorage) for demo events; events from other origins are stored in memory on the service and polled every few seconds.
+- **Event log:** The service registers events (message_sent, search, message_received, error) automatically when handling chat requests. The demo page polls GET /api/events to display them.
 - **Chat API:** Each **POST /api/chat** request is independent (no shared session). The service can handle many simultaneous requests from different products; each request is scoped by **product_id** (project) for RAG and responses are streamed per request.
 
 ## Other commands

@@ -198,7 +198,6 @@ export default function TipCalculatorPage() {
           apiUrl={`${chatServiceUrl}/api/chat`}
           productId={process.env.NEXT_PUBLIC_TIP_CALCULATOR_PRODUCT_ID || ""}
           productName="Tip Calculator"
-          eventReportUrl={`${chatServiceUrl}/api/events`}
           user={{ id: "tip-user", name: "Tip User" }}
           displayMode="floating"
           placeholder="Ask about tipping or splitting the bill..."

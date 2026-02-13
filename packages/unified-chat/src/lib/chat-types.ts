@@ -45,8 +45,6 @@ export interface ChatAssistantProps {
   showSources?: boolean
   maxMessages?: number
   onEvent?: (event: ChatAssistantEvent) => void
-  /** Optional: POST events (except open/close) to this URL so a central event log can show activity from consuming apps */
-  eventReportUrl?: string
   placeholder?: string
   title?: string
   subtitle?: string
