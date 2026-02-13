@@ -3,9 +3,10 @@
  * events. Persisted in DB so events are visible across serverless instances.
  */
 
-import { insertChatEvent, listChatEvents } from "@/lib/db"
+import { insertChatEvent, listChatEvents, deleteChatEvent } from "@/lib/db"
 
 export type StoredEvent = {
+  id?: string
   productId: string
   productName?: string
   type: string
@@ -24,4 +25,8 @@ export async function pushEvent(event: Omit<StoredEvent, "time">): Promise<void>
 
 export async function getEvents(productId?: string | null): Promise<StoredEvent[]> {
   return listChatEvents(productId)
+}
+
+export async function deleteEvent(id: string): Promise<boolean> {
+  return deleteChatEvent(id)
 }

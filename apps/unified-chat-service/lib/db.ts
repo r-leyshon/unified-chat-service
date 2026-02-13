@@ -282,23 +282,24 @@ export async function insertChatEvent(
 
 /** List recent chat events, optionally filtered by productId. */
 export async function listChatEvents(productId?: string | null): Promise<
-  { productId: string; productName?: string; type: string; payload?: unknown; time: string }[]
+  { id: string; productId: string; productName?: string; type: string; payload?: unknown; time: string }[]
 > {
   const db = getDb()
   const rows = productId
     ? (await db.query(
-        `SELECT product_id, product_name, type, payload, created_at
+        `SELECT id, product_id, product_name, type, payload, created_at
          FROM chat_events WHERE product_id = $1
          ORDER BY created_at DESC LIMIT 100`,
         [productId],
       )).rows
     : (await db.query(
-        `SELECT product_id, product_name, type, payload, created_at
+        `SELECT id, product_id, product_name, type, payload, created_at
          FROM chat_events
          ORDER BY created_at DESC LIMIT 100`,
       )).rows
-  return (rows as Array<{ product_id: string; product_name: string | null; type: string; payload: unknown; created_at: string | Date }>).map(
+  return (rows as Array<{ id: string; product_id: string; product_name: string | null; type: string; payload: unknown; created_at: string | Date }>).map(
     (r) => ({
+      id: r.id,
       productId: r.product_id,
       productName: r.product_name ?? undefined,
       type: r.type,
@@ -306,6 +307,12 @@ export async function listChatEvents(productId?: string | null): Promise<
       time: typeof r.created_at === "string" ? r.created_at : new Date(r.created_at).toISOString(),
     }),
   )
+}
+
+/** Delete a chat event by id. Returns true if a row was deleted. */
+export async function deleteChatEvent(id: string): Promise<boolean> {
+  const { rowCount } = await getDb().query("DELETE FROM chat_events WHERE id = $1", [id])
+  return (rowCount ?? 0) > 0
 }
 
 /** Cosine similarity search: returns chunks with content for a project. */

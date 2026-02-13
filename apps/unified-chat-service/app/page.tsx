@@ -6,10 +6,10 @@ import { ChatAssistant } from "unified-chat"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronDown, ChevronUp, Trash2 } from "lucide-react"
 
 type Project = { id: string; name: string; slug: string; description?: string | null }
-type LogEvent = { type: string; time: string; payload?: unknown; productName?: string }
+type LogEvent = { id?: string; type: string; time: string; payload?: unknown; productName?: string }
 
 function formatEventPayload(event: LogEvent): string {
   if (!event.payload || typeof event.payload !== "object") return ""
@@ -41,6 +41,18 @@ export default function Home() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>("")
   const [projectsLoading, setProjectsLoading] = useState(true)
 
+  async function handleDeleteEvent(e: React.MouseEvent, eventId: string) {
+    e.stopPropagation()
+    try {
+      const res = await fetch(`/api/events/${eventId}`, { method: "DELETE" })
+      if (res.ok) {
+        setEvents((prev) => prev.filter((ev) => ev.id !== eventId))
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
   useEffect(() => {
     const fetchEvents = () => {
       fetch("/api/events")
@@ -48,7 +60,8 @@ export default function Home() {
         .then((data) => {
           if (Array.isArray(data)) {
             setEvents(
-              data.map((e: { type: string; time: string; payload?: unknown; productId?: string; productName?: string }) => ({
+              data.map((e: { id?: string; type: string; time: string; payload?: unknown; productId?: string; productName?: string }) => ({
+                id: e.id,
                 type: e.type,
                 time: e.time,
                 payload: e.payload,
@@ -190,41 +203,53 @@ export default function Home() {
                   <p className="text-xs text-muted-foreground">No events yet. Try sending a message!</p>
                 ) : (
                   events.map((event, idx) => {
-                    const eventKey = `${event.time}-${event.type}-${idx}`
+                    const eventKey = event.id ?? `${event.time}-${event.type}-${idx}`
                     const fullPayload = formatEventPayload(event)
                     const hasPayload = fullPayload.length > 0
                     const isExpanded = expandedEventKey === eventKey
                     return (
                       <div key={eventKey} className="rounded border border-border/50 bg-secondary/50 overflow-hidden">
-                        <button
-                          type="button"
-                          className="w-full text-left text-xs p-2 hover:bg-secondary/80 transition-colors cursor-pointer"
-                          onClick={() => setExpandedEventKey((k) => (k === eventKey ? null : eventKey))}
-                        >
-                          <span className="font-mono text-primary">
-                            {event.type === "search" &&
-                            event.payload &&
-                            typeof event.payload === "object" &&
-                            "searchTerms" in event.payload &&
-                            Array.isArray(event.payload.searchTerms)
-                              ? `search: ${(event.payload.searchTerms as string[]).join(", ")}`
-                              : event.type}
-                          </span>
-                          <br />
-                          <span className="text-muted-foreground">
-                            {event.time}
-                            {event.productName && <> · {event.productName}</>}
-                            {hasPayload && (
-                              <span className="ml-1 inline-flex items-center gap-0.5">
-                                {isExpanded ? (
-                                  <ChevronUp className="w-3 h-3 inline" />
-                                ) : (
-                                  <ChevronDown className="w-3 h-3 inline" />
-                                )}
-                              </span>
-                            )}
-                          </span>
-                        </button>
+                        <div className="flex items-stretch">
+                          <button
+                            type="button"
+                            className="flex-1 min-w-0 text-left text-xs p-2 hover:bg-secondary/80 transition-colors cursor-pointer"
+                            onClick={() => setExpandedEventKey((k) => (k === eventKey ? null : eventKey))}
+                          >
+                            <span className="font-mono text-primary">
+                              {event.type === "search" &&
+                              event.payload &&
+                              typeof event.payload === "object" &&
+                              "searchTerms" in event.payload &&
+                              Array.isArray(event.payload.searchTerms)
+                                ? `search: ${(event.payload.searchTerms as string[]).join(", ")}`
+                                : event.type}
+                            </span>
+                            <br />
+                            <span className="text-muted-foreground">
+                              {event.time}
+                              {event.productName && <> · {event.productName}</>}
+                              {hasPayload && (
+                                <span className="ml-1 inline-flex items-center gap-0.5">
+                                  {isExpanded ? (
+                                    <ChevronUp className="w-3 h-3 inline" />
+                                  ) : (
+                                    <ChevronDown className="w-3 h-3 inline" />
+                                  )}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                          {event.id && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteEvent(e, event.id!)}
+                              className="shrink-0 p-2 text-muted-foreground hover:text-destructive hover:bg-secondary/80 transition-colors"
+                              aria-label="Delete event"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                         {hasPayload && isExpanded && (
                           <div className="border-t border-border/50 p-2 bg-background/50 max-h-48 overflow-auto">
                             <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground">
