@@ -10,16 +10,16 @@ This guide explains how to add the **Unified Chat** widget to your app when impo
 
 ## 1. Install the chat component from GitHub
 
-Add the `unified-chat` package from the monorepo:
+The package ships **pre-compiled** JavaScript. No custom transpilation, aliases, or `--webpack` workarounds needed.
 
 ```bash
 npm install git+https://github.com/r-leyshon/unified-chat-service.git#main
 ```
 
-If your bundler supports subpath installs (e.g. for a specific package in the monorepo):
+Or add to `package.json`:
 
-```bash
-npm install "github:r-leyshon/unified-chat-service#main:packages/unified-chat"
+```json
+"unified-chat": "github:r-leyshon/unified-chat-service#main"
 ```
 
 > **Alternative:** Fork the repo and add `unified-chat` as a workspace dependency:  
@@ -90,7 +90,26 @@ export default function MyPage() {
 
 > Chat events are registered automatically by the service; no `eventReportUrl` needed.
 
-## Theming
+## 5. Tailwind content
+
+Include the package in Tailwind's content scan so its classes (e.g. `w-full`, `sm:w-[380px]`) are generated. Without this, the chat window may render with missing or incorrect styles.
+
+**Tailwind v4** (in `globals.css`):
+
+```css
+@source "../node_modules/unified-chat/packages/unified-chat/dist";
+```
+
+**Tailwind v3** (in `tailwind.config.ts`):
+
+```ts
+content: [
+  // ... your existing paths ...
+  "./node_modules/unified-chat/packages/unified-chat/dist/**/*.{js,mjs}",
+],
+```
+
+## 6. Theming and styling
 
 The widget uses Tailwind and CSS variables. If your app defines `--primary`, `--background`, `--foreground`, etc., the chat will follow your theme. You can also override with the `theme` prop:
 

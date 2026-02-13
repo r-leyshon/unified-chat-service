@@ -95,5 +95,6 @@ Chat events are **registered automatically** by the service when handling POST /
 
 ## Other commands
 
-- **Root:** `npm run build` — builds all workspaces that define a build script.
+- **Root:** `npm run build` — builds all workspaces (including `packages/unified-chat` → `dist/`, then apps).
+- **Package only:** `npm run build -w packages/unified-chat` — rebuild the chat component after editing it; commit `dist/` for GitHub installers.
 - **Service:** From `apps/unified-chat-service`, `make up` / `make down` / `make init-db` / `make logs` for local Postgres (see **Makefile**).

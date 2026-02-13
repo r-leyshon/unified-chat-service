@@ -14,5 +14,14 @@
   ],
   "devDependencies": {
     "baseline-browser-mapping": "^2.9.19"
+  },
+  "main": "./packages/unified-chat/dist/index.js",
+  "types": "./packages/unified-chat/dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./packages/unified-chat/dist/index.d.ts",
+      "import": "./packages/unified-chat/dist/index.mjs",
+      "require": "./packages/unified-chat/dist/index.js"
+    }
   }
 }
